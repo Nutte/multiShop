@@ -11,10 +11,20 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    public function __construct()
+    {
+        // 1. БЕЗОПАСНОСТЬ: Только Супер-Админ имеет доступ к этому контроллеру
+        // Если обычный менеджер попытается зайти -> 403 Forbidden
+        $this->middleware(function ($request, $next) {
+            if (auth()->user()->role !== 'super_admin') {
+                abort(403, 'Access denied. Only Super Admin can manage users.');
+            }
+            return $next($request);
+        });
+    }
+
     public function index()
     {
-        // Показываем всех кроме текущего админа, чтобы случайно себя не удалить
-        // Или просто всех
         $users = User::orderBy('id')->get();
         return view('admin.users.index', compact('users'));
     }
@@ -31,6 +41,8 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'role' => 'required|in:manager,super_admin',
+            // Если роль менеджер - tenant_id обязателен, если админ - nullable
+            'tenant_id' => 'required_if:role,manager',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -54,7 +66,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'role' => 'required|in:manager,super_admin',
-            // Пароль опционален
+            'tenant_id' => 'required_if:role,manager',
             'password' => 'nullable|string|min:6',
         ]);
 
@@ -74,7 +86,6 @@ class UserController extends Controller
         if ($id == auth()->id()) {
             return back()->with('error', 'You cannot delete yourself.');
         }
-        
         User::destroy($id);
         return back()->with('success', 'User deleted.');
     }

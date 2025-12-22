@@ -7,13 +7,32 @@
 @section('body_class', 'bg-gray-900 text-white')
 
 @section('content')
+    <!-- Categories Filter -->
+    <div class="flex gap-4 overflow-x-auto pb-4 mb-8 border-b border-gray-800">
+        <a href="/" class="text-yellow-400 font-bold uppercase whitespace-nowrap hover:text-white">All</a>
+        @foreach($categories as $cat)
+            <a href="/?category={{ $cat->slug }}" class="text-gray-400 font-bold uppercase whitespace-nowrap hover:text-yellow-400">
+                {{ $cat->name }}
+            </a>
+        @endforeach
+    </div>
+
     <h1 class="text-4xl font-black text-yellow-400 mb-8 uppercase tracking-widest text-center">New Drop</h1>
+    
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        @foreach($products as $product)
-            <div class="bg-gray-800 border-2 border-yellow-400 p-4 transform hover:-translate-y-2 transition duration-300">
-                <div class="h-48 bg-gray-700 mb-4 flex items-center justify-center text-4xl">👟</div>
-                <h2 class="text-xl font-bold mb-2">{{ $product->name }}</h2>
-                <p class="text-yellow-400 text-2xl font-mono">${{ $product->price }}</p>
+        @forelse($products as $product)
+            <div class="bg-gray-800 border-2 border-yellow-400 p-4 transform hover:-translate-y-2 transition duration-300 flex flex-col">
+                <a href="{{ route('product.show', $product->slug) }}" class="block flex-1">
+                    <div class="h-64 bg-gray-700 mb-4 overflow-hidden flex items-center justify-center relative group">
+                        @if($product->image_path)
+                             <img src="{{ $product->image_url }}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        @else
+                             <span class="text-4xl">👟</span>
+                        @endif
+                    </div>
+                    <h2 class="text-xl font-bold mb-2">{{ $product->name }}</h2>
+                    <p class="text-yellow-400 text-2xl font-mono">${{ $product->price }}</p>
+                </a>
                 <form action="{{ route('cart.add') }}" method="POST" class="mt-4">
                     @csrf
                     <input type="hidden" name="product_id" value="{{ $product->id }}">
@@ -22,6 +41,12 @@
                     </button>
                 </form>
             </div>
-        @endforeach
+        @empty
+            <div class="col-span-3 text-center text-gray-500 py-12">No products found.</div>
+        @endforelse
+    </div>
+    
+    <div class="mt-8">
+        {{ $products->links() }}
     </div>
 @endsection
