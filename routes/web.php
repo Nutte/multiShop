@@ -12,7 +12,8 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\AttributeController;
-// Импортируем наш новый Middleware
+// Импорт нового контроллера
+use App\Http\Controllers\Admin\TelegramSettingsController;
 use App\Http\Middleware\AdminTenantMiddleware;
 
 // --- АДМИНКА ---
@@ -25,7 +26,6 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
     });
 
-    // ДОБАВЛЕНО: AdminTenantMiddleware::class в список middleware
     Route::middleware(['auth', AdminTenantMiddleware::class])->prefix('admin')->name('admin.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -38,7 +38,6 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         })->name('switch_tenant');
 
         Route::resource('users', UserController::class);
-        
         Route::resource('orders', OrderController::class)->only(['index', 'show', 'update']);
         Route::post('/orders/{id}/notify', [OrderController::class, 'sendNotification'])->name('orders.notify');
         
@@ -48,6 +47,17 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
         Route::post('/attributes', [AttributeController::class, 'store'])->name('attributes.store');
         Route::delete('/attributes/{id}', [AttributeController::class, 'destroy'])->name('attributes.destroy');
+
+        // --- НОВЫЕ МАРШРУТЫ ДЛЯ ТЕЛЕГРАМА ---
+        // Доступны только Супер-Админу (проверка внутри контроллера)
+        Route::prefix('settings/telegram')->name('settings.telegram.')->group(function () {
+            Route::get('/', [TelegramSettingsController::class, 'index'])->name('index');
+            Route::post('/', [TelegramSettingsController::class, 'store'])->name('store');
+            Route::put('/{id}', [TelegramSettingsController::class, 'update'])->name('update');
+            Route::delete('/{id}', [TelegramSettingsController::class, 'destroy'])->name('destroy');
+            Route::get('/{id}/test', [TelegramSettingsController::class, 'test'])->name('test');
+            Route::post('/send-message', [TelegramSettingsController::class, 'sendMessage'])->name('sendMessage');
+        });
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');

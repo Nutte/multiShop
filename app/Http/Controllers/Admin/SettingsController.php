@@ -4,25 +4,35 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\TenantSetting;
 use Illuminate\Http\Request;
+use App\Models\TelegramConfig; // Импортируем модель телеграма
 
 class SettingsController extends Controller
 {
-    public function index()
+    private function checkSuperAdmin()
     {
-        $settings = TenantSetting::all()->pluck('value', 'key');
-        return view('admin.settings.index', compact('settings'));
+        if (auth()->user()->role !== 'super_admin') {
+            abort(403, 'Access denied.');
+        }
     }
 
+    public function index()
+    {
+        $this->checkSuperAdmin();
+
+        // Данные для Telegram вкладки
+        $telegramConfigs = TelegramConfig::all();
+        $tenants = config('tenants.tenants');
+
+        return view('admin.settings.index', compact('telegramConfigs', 'tenants'));
+    }
+
+    // Метод для сохранения ОБЩИХ настроек (заглушка для примера)
     public function update(Request $request)
     {
-        $data = $request->except('_token');
-        
-        foreach ($data as $key => $value) {
-            TenantSetting::set($key, $value);
-        }
-
-        return back()->with('success', 'Settings saved successfully.');
+        $this->checkSuperAdmin();
+        // Здесь логика сохранения названия сайта, логотипа и т.д.
+        // ...
+        return back()->with('success', 'General settings updated.');
     }
 }
