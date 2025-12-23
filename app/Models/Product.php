@@ -17,7 +17,7 @@ class Product extends Model
         'description', 
         'price', 
         'sku', 
-        'stock_quantity', 
+        'stock_quantity', // Общее количество (сумма вариантов)
         'attributes'
     ];
 
@@ -36,23 +36,74 @@ class Product extends Model
         return $this->hasMany(ProductImage::class)->orderBy('sort_order', 'asc');
     }
 
-    // Основная логика получения обложки
-    public function getCoverUrlAttribute()
+    // Новая связь: Варианты (Размеры + Количество)
+    public function variants()
     {
-        // Берем первое изображение из коллекции (благодаря orderBy в связи оно будет с sort_order=0)
-        $cover = $this->images->first();
-        
-        if ($cover) {
-            return $cover->url;
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    // Получить остаток для конкретного размера
+    public function getStockForSize($size)
+    {
+        // Если вариантов нет (товар без размеров), возвращаем общий сток
+        if ($this->variants->isEmpty()) {
+            return $this->stock_quantity;
         }
         
-        // Дефолтная заглушка, если картинок нет
+        $variant = $this->variants->where('size', $size)->first();
+        return $variant ? $variant->stock : 0;
+    }
+
+    // Метод уменьшения остатка (вызывается при заказе)
+    public function decreaseStock(string $size, int $quantity = 1)
+    {
+        $telegram = app(\App\Services\TelegramService::class);
+        $tenantName = app(\App\Services\TenantService::class)->getCurrentTenantId() ?? 'Unknown';
+
+        // 1. Если есть варианты (размерный товар)
+        if ($this->variants->count() > 0) {
+            $variant = $this->variants()->where('size', $size)->first();
+            
+            if ($variant && $variant->stock >= $quantity) {
+                $variant->decrement('stock', $quantity);
+                
+                // Проверка на 0
+                if ($variant->stock <= 0) {
+                    $telegram->sendStockAlert($this->name, $size, $tenantName);
+                }
+            }
+        } 
+        // 2. Если товар безразмерный (используем общее поле)
+        else {
+            if ($this->stock_quantity >= $quantity) {
+                $this->decrement('stock_quantity', $quantity);
+                if ($this->stock_quantity <= 0) {
+                    $telegram->sendStockAlert($this->name, 'One Size', $tenantName);
+                }
+            }
+        }
+
+        // Обновляем общий счетчик товара (сумма всех вариантов)
+        $this->recalculateTotalStock();
+    }
+
+    public function recalculateTotalStock()
+    {
+        if ($this->variants()->count() > 0) {
+            $total = $this->variants()->sum('stock');
+            $this->update(['stock_quantity' => $total]);
+        }
+    }
+
+    // Обложка (старый код)
+    public function getCoverUrlAttribute()
+    {
+        $cover = $this->images->first();
+        if ($cover) return $cover->url;
         $text = urlencode($this->sku ?? 'Product');
         return "https://placehold.co/600x600/e2e8f0/1e293b?text={$text}";
     }
 
-    // --- FIX: Обратная совместимость для админки ---
-    // Этот метод позволяет использовать $product->image_url в старых шаблонах
     public function getImageUrlAttribute()
     {
         return $this->cover_url;

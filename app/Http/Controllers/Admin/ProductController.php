@@ -6,7 +6,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\ProductImage; // Не забудь импортировать модель
+use App\Models\ProductImage;
+use App\Models\ProductVariant;
 use App\Models\AttributeOption;
 use App\Services\ProductService;
 use App\Services\TenantService;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -26,45 +28,36 @@ class ProductController extends Controller
         $this->productService = $productService;
     }
 
-    // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ---
+    // --- CONTEXT HELPERS ---
 
     private function resolveContext(Request $request)
     {
         $user = auth()->user();
-
-        // 1. Менеджер: Всегда в своем контексте
         if ($user->role !== 'super_admin') {
             return $this->tenantService->getCurrentTenantId();
         }
-
-        // 2. Супер-Админ: переключаемся, если передан ID
         $tenantId = $request->get('tenant_id');
         if ($tenantId) {
             $this->tenantService->switchTenant($tenantId);
             return $tenantId;
         }
-
-        // Если контекст уже есть
         $current = $this->tenantService->getCurrentTenantId();
         if ($current) return $current;
-
         return null;
     }
 
-    // Получить товары всех магазинов (для списка "ALL STORES")
     private function getAllTenantsProducts(Request $request)
     {
         $allProducts = new Collection();
         foreach (config('tenants.tenants') as $id => $config) {
             try {
                 $this->tenantService->switchTenant($id);
-                $query = Product::with(['categories', 'images'])->latest()->take(5);
+                $query = Product::with(['categories', 'images', 'variants'])->latest()->take(5);
                 
                 if ($request->filled('search')) {
                     $s = $request->search;
                     $query->where(fn($q) => $q->where('name', 'ilike', "%$s%")->orWhere('sku', 'ilike', "%$s%"));
                 }
-
                 $products = $query->get();
                 $products->each(function($p) use ($config, $id) {
                     $p->tenant_name = $config['name'];
@@ -77,35 +70,29 @@ class ProductController extends Controller
         return $allProducts;
     }
 
-    // --- ОСНОВНЫЕ МЕТОДЫ ---
+    // --- ACTIONS ---
 
     public function index(Request $request)
     {
         $isSuperAdmin = auth()->user()->role === 'super_admin';
         $selectedTenant = $request->get('tenant_id');
         
-        // Режим "ВСЕ МАГАЗИНЫ"
         if ($isSuperAdmin && empty($selectedTenant)) {
             $products = $this->getAllTenantsProducts($request);
-            // Пустые коллекции для фильтров, так как в режиме ALL они не работают
             $categories = new Collection(); $sizes = new Collection(); $types = new Collection();
             $currentTenantId = null;
             return view('admin.products.index', compact('products', 'categories', 'sizes', 'types', 'currentTenantId'));
         }
 
-        // Режим "ОДИН МАГАЗИН"
         $currentTenantId = $this->resolveContext($request);
-        
-        // Если Супер-Админ без контекста -> берем первый магазин по умолчанию
         if (!$currentTenantId && $isSuperAdmin) {
              $first = array_key_first(config('tenants.tenants'));
              $this->tenantService->switchTenant($first);
              $currentTenantId = $first;
         }
 
-        $query = Product::with(['categories', 'images']);
+        $query = Product::with(['categories', 'images', 'variants']);
 
-        // Фильтры
         if ($request->filled('search')) {
             $query->where(fn($q) => $q->where('name', 'ilike', "%{$request->search}%")->orWhere('sku', 'ilike', "%{$request->search}%"));
         }
@@ -113,6 +100,7 @@ class ProductController extends Controller
             $query->whereHas('categories', fn($q) => $q->where('categories.id', $request->category_id));
         }
         if ($request->filled('size')) {
+            // Ищем в JSON атрибутах, так как там мы дублируем список размеров
             $query->whereRaw("attributes->'size' ? ?", [$request->size]);
         }
         if ($request->filled('type')) {
@@ -120,7 +108,6 @@ class ProductController extends Controller
         }
 
         $products = $query->latest()->paginate(20)->withQueryString();
-        
         $tenantDomain = config('tenants.tenants.' . $currentTenantId . '.domain');
         foreach ($products as $product) {
             $product->preview_url = "http://{$tenantDomain}/products/{$product->slug}?preview=true";
@@ -135,11 +122,9 @@ class ProductController extends Controller
         return view('admin.products.index', compact('products', 'categories', 'sizes', 'types', 'currentTenantId'));
     }
 
-    // Единый метод для показа формы (Create/Edit)
     public function form(Request $request, $id = null)
     {
         $currentTenantId = $this->resolveContext($request);
-
         if (!$currentTenantId && auth()->user()->role === 'super_admin') {
              $first = array_key_first(config('tenants.tenants'));
              $this->tenantService->switchTenant($first);
@@ -147,7 +132,7 @@ class ProductController extends Controller
         }
 
         if ($id) {
-            $product = Product::with(['categories', 'images'])->findOrFail($id);
+            $product = Product::with(['categories', 'images', 'variants'])->findOrFail($id);
             $action = route('admin.products.update', $product->id);
             $method = 'PUT';
             $title = "Edit: " . $product->name;
@@ -170,11 +155,9 @@ class ProductController extends Controller
         ));
     }
 
-    // Перенаправления для Resource Controller
     public function create(Request $request) { return $this->form($request); }
     public function edit(Request $request, $id) { return $this->form($request, $id); }
 
-    // --- СОХРАНЕНИЕ (STORE) ---
     public function store(Request $request)
     {
         if (auth()->user()->role === 'super_admin' && $request->has('target_tenant')) {
@@ -185,8 +168,17 @@ class ProductController extends Controller
 
         $validated = $this->validateProduct($request);
 
-        // 1. Создаем атрибуты в справочнике
-        $this->syncAttributes($request);
+        // 1. Считаем общий сток на основе вариантов
+        $variantsInput = $request->input('variants', []);
+        $totalStock = 0;
+        $sizeList = [];
+
+        foreach ($variantsInput as $v) {
+            if (!empty($v['size'])) {
+                $totalStock += (int)($v['stock'] ?? 0);
+                $sizeList[] = $v['size'];
+            }
+        }
 
         // 2. Создаем сам товар
         $product = $this->productService->create([
@@ -194,34 +186,24 @@ class ProductController extends Controller
             'slug' => Str::slug($validated['name']) . '-' . Str::random(4),
             'price' => $validated['price'],
             'sku' => $validated['sku'],
-            'stock_quantity' => $validated['stock_quantity'],
+            'stock_quantity' => $totalStock, // Авто-сумма
             'description' => $request->input('description'),
             'attributes' => [
                 'type' => $request->attributes_type,
-                'size' => $request->attributes_size ?? [],
+                'size' => $sizeList, // Сохраняем список размеров для фильтрации
             ]
         ]);
 
-        // 3. Сохраняем ИЗОБРАЖЕНИЯ (Множественная загрузка)
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $index => $file) {
-                $path = $file->store('media', 'tenant');
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'path' => $path,
-                    'sort_order' => $index // 0 станет обложкой
-                ]);
-            }
-        }
-
-        // 4. Привязываем категории
+        // 3. Синхронизируем Справочники (Атрибуты), Категории, Изображения и Варианты
+        $this->syncAttributesData($request->attributes_type, $sizeList);
         $this->syncCategories($product, $request->categories);
+        $this->syncImages($request, $product);
+        $this->syncVariants($product, $variantsInput);
 
         return redirect()->route('admin.products.index', ['tenant_id' => $this->tenantService->getCurrentTenantId()])
                          ->with('success', 'Product created successfully.');
     }
 
-    // --- ОБНОВЛЕНИЕ (UPDATE) ---
     public function update(Request $request, $id)
     {
         $this->resolveContext($request);
@@ -229,117 +211,85 @@ class ProductController extends Controller
         
         $validated = $this->validateProduct($request, $id);
         
-        $this->syncAttributes($request);
+        // 1. Считаем общий сток
+        $variantsInput = $request->input('variants', []);
+        $totalStock = 0;
+        $sizeList = [];
 
-        // 1. Обработка НОВЫХ изображений
-        if ($request->hasFile('new_images')) {
-            // Находим последний индекс сортировки, чтобы добавить новые в конец
-            $maxOrder = $product->images()->max('sort_order') ?? -1;
-            
-            foreach ($request->file('new_images') as $file) {
-                $path = $file->store('media', 'tenant');
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'path' => $path,
-                    'sort_order' => ++$maxOrder
-                ]);
+        foreach ($variantsInput as $v) {
+            if (!empty($v['size'])) {
+                $totalStock += (int)($v['stock'] ?? 0);
+                $sizeList[] = $v['size'];
             }
         }
 
-        // 2. Обработка УДАЛЕНИЯ выбранных изображений
-        if ($request->filled('deleted_images')) {
-            $idsToDelete = $request->input('deleted_images');
-            $images = ProductImage::whereIn('id', $idsToDelete)
-                                  ->where('product_id', $product->id)
-                                  ->get();
-            
-            foreach ($images as $img) {
-                // Удаляем файл с диска
-                Storage::disk('tenant')->delete($img->path);
-                // Удаляем запись из БД
-                $img->delete();
-            }
-        }
-
-        // 3. Обработка СОРТИРОВКИ (Drag & Drop)
-        if ($request->filled('sorted_images_ids')) {
-            $sortedIds = explode(',', $request->input('sorted_images_ids'));
-            // Проходимся по списку ID и обновляем порядок
-            foreach ($sortedIds as $index => $imgId) {
-                ProductImage::where('id', $imgId)
-                            ->where('product_id', $product->id)
-                            ->update(['sort_order' => $index]);
-            }
-        }
-
-        // 4. Обновляем данные товара
+        // 2. Обновляем товар
         $product->update([
             'name' => $validated['name'],
             'price' => $validated['price'],
             'sku' => $validated['sku'],
-            'stock_quantity' => $validated['stock_quantity'],
+            'stock_quantity' => $totalStock, // Авто-сумма
             'description' => $request->input('description'),
             'attributes' => [
                 'type' => $request->attributes_type,
-                'size' => $request->attributes_size ?? [],
+                'size' => $sizeList,
             ]
         ]);
 
+        // 3. Синхронизируем всё остальное
+        $this->syncAttributesData($request->attributes_type, $sizeList);
         $this->syncCategories($product, $request->categories);
+        $this->syncImagesUpdate($request, $product);
+        $this->syncVariants($product, $variantsInput);
 
         return redirect()->route('admin.products.index', ['tenant_id' => $this->tenantService->getCurrentTenantId()])
                          ->with('success', 'Product updated successfully.');
     }
 
-    // --- УДАЛЕНИЕ (DESTROY) ---
     public function destroy(Request $request, $id)
     {
         $this->resolveContext($request);
         $product = Product::findOrFail($id);
         
-        // Удаляем все картинки с диска
-        foreach ($product->images as $img) {
-            Storage::disk('tenant')->delete($img->path);
-        }
-        // Удаляем записи картинок (каскадно удалились бы, но лучше явно)
-        $product->images()->delete();
+        // Сервис удалит изображения и варианты
+        $this->productService->delete($product);
         
-        // Удаляем товар
-        $product->delete();
-        
-        return back()->with('success', 'Product and images deleted.');
+        return back()->with('success', 'Product deleted.');
     }
 
-    // --- ВНУТРЕННИЕ МЕТОДЫ ---
+    // --- HELPERS ---
 
     private function validateProduct(Request $request, $id = null)
     {
         return $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
-            'categories' => 'required|array',
-            'stock_quantity' => 'required|integer|min:0',
             'sku' => 'required|string|max:50',
+            'categories' => 'required|array',
             
-            // Валидация массивов картинок
-            'images.*' => 'image|max:10240', // При создании (до 10МБ)
-            'new_images.*' => 'image|max:10240', // При обновлении
+            'attributes_type' => 'required|string',
+            // attributes_size больше не валидируем отдельно, берем из variants
             
-            'attributes_type' => 'required|string', 
-            'attributes_size' => 'nullable|array', 
+            'variants.*.size' => 'required|string',
+            'variants.*.stock' => 'required|integer|min:0',
+            
+            'images.*' => 'image|max:10240',
+            'new_images.*' => 'image|max:10240',
         ]);
     }
 
-    private function syncAttributes(Request $request)
+    // Создание записей в справочнике AttributeOption
+    private function syncAttributesData($type, $sizes)
     {
-        // Используем поиск по слагу для избежания дублей
-        $typeSlug = Str::slug($request->attributes_type);
+        // Тип
+        $typeSlug = Str::slug($type);
         AttributeOption::firstOrCreate(
             ['type' => 'product_type', 'slug' => $typeSlug], 
-            ['value' => $request->attributes_type]
+            ['value' => $type]
         );
 
-        foreach ($request->attributes_size ?? [] as $sizeName) {
+        // Размеры
+        foreach ($sizes as $sizeName) {
             $sizeSlug = Str::slug($sizeName);
             AttributeOption::firstOrCreate(
                 ['type' => 'size', 'slug' => $sizeSlug], 
@@ -355,7 +305,6 @@ class ProductController extends Controller
             if (is_numeric($input)) {
                 $categoryIds[] = $input;
             } else {
-                // Используем поиск по слагу
                 $slug = Str::slug($input);
                 $newCat = Category::firstOrCreate(
                     ['slug' => $slug],
@@ -365,5 +314,72 @@ class ProductController extends Controller
             }
         }
         $product->categories()->sync($categoryIds);
+    }
+
+    private function syncImages(Request $request, Product $product)
+    {
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $index => $file) {
+                $path = $file->store('media', 'tenant');
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'path' => $path,
+                    'sort_order' => $index
+                ]);
+            }
+        }
+    }
+
+    private function syncImagesUpdate(Request $request, Product $product)
+    {
+        // Новые фото
+        if ($request->hasFile('new_images')) {
+            $maxOrder = $product->images()->max('sort_order') ?? -1;
+            foreach ($request->file('new_images') as $file) {
+                $path = $file->store('media', 'tenant');
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'path' => $path,
+                    'sort_order' => ++$maxOrder
+                ]);
+            }
+        }
+
+        // Удаление
+        if ($request->filled('deleted_images')) {
+            $images = ProductImage::whereIn('id', $request->input('deleted_images'))
+                                  ->where('product_id', $product->id)->get();
+            foreach ($images as $img) {
+                Storage::disk('tenant')->delete($img->path);
+                $img->delete();
+            }
+        }
+
+        // Сортировка
+        if ($request->filled('sorted_images_ids')) {
+            $sortedIds = explode(',', $request->input('sorted_images_ids'));
+            foreach ($sortedIds as $index => $imgId) {
+                ProductImage::where('id', $imgId)
+                            ->where('product_id', $product->id)
+                            ->update(['sort_order' => $index]);
+            }
+        }
+    }
+
+    private function syncVariants(Product $product, array $variantsInput)
+    {
+        // Простая стратегия: удалить старые, создать новые
+        // В продакшене лучше обновлять по ID, чтобы не дергать ID-шники
+        $product->variants()->delete();
+
+        foreach ($variantsInput as $v) {
+            if (!empty($v['size'])) {
+                ProductVariant::create([
+                    'product_id' => $product->id,
+                    'size' => $v['size'],
+                    'stock' => (int)($v['stock'] ?? 0)
+                ]);
+            }
+        }
     }
 }

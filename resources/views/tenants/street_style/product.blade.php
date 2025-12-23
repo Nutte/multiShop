@@ -44,15 +44,27 @@
                     <span class="ml-2 font-bold">{{ $product->attributes['type'] ?? 'N/A' }}</span>
                 </div>
 
-                @if(!empty($product->attributes['size']))
+                @if($product->variants->count() > 0)
                     <div class="mb-8">
                         <div class="text-gray-500 uppercase text-xs font-bold tracking-widest mb-2">Select Size:</div>
-                        <div class="flex gap-2">
-                            @foreach($product->attributes['size'] as $size)
-                                <label class="cursor-pointer">
-                                    <input type="radio" name="size" value="{{ $size }}" class="peer sr-only">
-                                    <div class="w-10 h-10 flex items-center justify-center border border-gray-600 peer-checked:bg-yellow-400 peer-checked:text-black peer-checked:border-yellow-400 hover:border-yellow-400 transition font-bold">
-                                        {{ $size }}
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($product->variants as $variant)
+                                @php $isOutOfStock = $variant->stock <= 0; @endphp
+                                <label class="cursor-pointer {{ $isOutOfStock ? 'opacity-50 cursor-not-allowed' : '' }}">
+                                    <input type="radio" 
+                                           name="size" 
+                                           value="{{ $variant->size }}" 
+                                           class="peer sr-only" 
+                                           {{ $isOutOfStock ? 'disabled' : '' }}>
+                                    
+                                    <div class="min-w-[40px] h-10 px-3 flex items-center justify-center border border-gray-600 
+                                                {{ $isOutOfStock ? 'bg-gray-800 text-gray-600 border-gray-700' : 'peer-checked:bg-yellow-400 peer-checked:text-black peer-checked:border-yellow-400 hover:border-yellow-400 transition' }} 
+                                                font-bold relative">
+                                        {{ $variant->size }}
+                                        
+                                        @if($isOutOfStock)
+                                            <span class="absolute -top-2 -right-2 text-[10px] bg-red-600 text-white px-1 rounded">SOLD</span>
+                                        @endif
                                     </div>
                                 </label>
                             @endforeach
@@ -63,8 +75,10 @@
                 <form action="{{ route('cart.add') }}" method="POST">
                     @csrf
                     <input type="hidden" name="product_id" value="{{ $product->id }}">
-                    <button class="w-full bg-yellow-400 text-black font-black py-4 uppercase tracking-widest hover:bg-yellow-300 transition text-xl">
-                        Add to Cart
+                    <!-- Кнопка блокируется, если общий сток 0, или если пользователь не выбрал размер (валидация HTML5) -->
+                    <button class="w-full bg-yellow-400 text-black font-black py-4 uppercase tracking-widest hover:bg-yellow-300 transition text-xl disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            {{ $product->stock_quantity <= 0 ? 'disabled' : '' }}>
+                        {{ $product->stock_quantity <= 0 ? 'SOLD OUT' : 'ADD TO CART' }}
                     </button>
                 </form>
             </div>
