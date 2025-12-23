@@ -11,7 +11,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\CategoryController;
-use App\Http\Controllers\Admin\AttributeController; // NEW
+use App\Http\Controllers\Admin\AttributeController;
 
 // --- АДМИНКА ---
 Route::domain(config('tenants.admin_domain'))->group(function () {
@@ -34,16 +34,19 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
             return back();
         })->name('switch_tenant');
 
+        // USERS: Доступен только Super Admin (проверка внутри контроллера)
         Route::resource('users', UserController::class);
+        
         Route::resource('orders', OrderController::class)->only(['index', 'show', 'update']);
         Route::post('/orders/{id}/notify', [OrderController::class, 'sendNotification'])->name('orders.notify');
         
         Route::resource('products', ProductController::class);
-        Route::resource('categories', CategoryController::class);
+        Route::resource('categories', CategoryController::class); // Использует стандартный {category} -> id
         
-        // НОВЫЙ РЕСУРС: АТРИБУТЫ
+        // ATTRIBUTES: Ручные маршруты для точности
         Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
         Route::post('/attributes', [AttributeController::class, 'store'])->name('attributes.store');
+        // ВАЖНО: Явно указываем {id}
         Route::delete('/attributes/{id}', [AttributeController::class, 'destroy'])->name('attributes.destroy');
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
@@ -55,10 +58,7 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
 // --- МАГАЗИНЫ ---
 Route::group([], function () {
     Route::get('/', [ShopController::class, 'index'])->name('home');
-    
-    // СТРАНИЦА ТОВАРА
     Route::get('/products/{slug}', [ShopController::class, 'show'])->name('product.show');
-    
     Route::get('/cart', [ShopController::class, 'cart'])->name('cart.index');
     Route::post('/cart/add', [ShopController::class, 'addToCart'])->name('cart.add');
     Route::post('/checkout', [ShopController::class, 'checkout'])->name('checkout');

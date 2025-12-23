@@ -1,0 +1,4333 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+app/
+  Console/
+    Commands/
+      TenantsMigrateCommand.php
+      TenantsStorageLinkCommand.php
+  Http/
+    Controllers/
+      Admin/
+        AttributeController.php
+        AuthController.php
+        CategoryController.php
+        DashboardController.php
+        OrderController.php
+        ProductController.php
+        ReportController.php
+        SettingsController.php
+        UserController.php
+      Api/
+        ProductController.php
+      Controller.php
+      ShopController.php
+    Middleware/
+      TenantMiddleware.php
+  Models/
+    AttributeOption.php
+    Category.php
+    Order.php
+    Product.php
+    TenantSetting.php
+    User.php
+  Providers/
+    AppServiceProvider.php
+  Services/
+    CartService.php
+    ProductService.php
+    SearchService.php
+    TenantService.php
+bootstrap/
+  cache/
+    .gitignore
+  app.php
+  providers.php
+config/
+  app.php
+  auth.php
+  cache.php
+  database.php
+  filesystems.php
+  logging.php
+  mail.php
+  queue.php
+  services.php
+  session.php
+  tenants.php
+database/
+  factories/
+    UserFactory.php
+  migrations/
+    0001_01_01_000000_create_users_table.php
+    0001_01_01_000001_create_cache_table.php
+    0001_01_01_000002_create_jobs_table.php
+    2024_01_01_000001_create_products_table.php
+    2024_01_01_000002_create_orders_table.php
+    2024_01_01_000003_create_tenant_settings_table.php
+    2024_01_01_000004_add_tenant_id_to_users_table.php
+    2024_01_01_000005_add_image_to_products_table.php
+    2024_01_01_000006_create_categories_table.php
+    2024_01_01_000007_refactor_categories_and_attributes.php
+  seeders/
+    DatabaseSeeder.php
+  .gitignore
+docker/
+  nginx/
+    conf.d/
+      app.conf
+  php/
+    Dockerfile
+public/
+  .htaccess
+  favicon.ico
+  index.php
+  robots.txt
+.editorconfig
+.env.example
+.gitattributes
+.gitignore
+artisan
+composer.json
+docker-compose.yml
+full_reset.sh
+package.json
+phpunit.xml
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".editorconfig">
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[compose.yaml]
+indent_size = 4
+</file>
+
+<file path=".env.example">
+APP_NAME=Laravel
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost
+
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+
+APP_MAINTENANCE_DRIVER=file
+# APP_MAINTENANCE_STORE=database
+
+# PHP_CLI_SERVER_WORKERS=4
+
+BCRYPT_ROUNDS=12
+
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+
+DB_CONNECTION=sqlite
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=laravel
+# DB_USERNAME=root
+# DB_PASSWORD=
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+
+BROADCAST_CONNECTION=log
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=database
+
+CACHE_STORE=database
+# CACHE_PREFIX=
+
+MEMCACHED_HOST=127.0.0.1
+
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_MAILER=log
+MAIL_SCHEME=null
+MAIL_HOST=127.0.0.1
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+VITE_APP_NAME="${APP_NAME}"
+</file>
+
+<file path=".gitattributes">
+* text=auto eol=lf
+
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+/.github export-ignore
+CHANGELOG.md export-ignore
+.styleci.yml export-ignore
+</file>
+
+<file path="app/Console/Commands/TenantsMigrateCommand.php">
+<?php
+// FILE: app/Console/Commands/TenantsMigrateCommand.php
+
+namespace App\Console\Commands;
+
+use App\Services\TenantService;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+
+class TenantsMigrateCommand extends Command
+{
+    protected $signature = 'tenants:migrate {--fresh : Wipe databases first} {--seed : Run seeders}';
+    protected $description = 'Run migrations for Public and ALL tenants';
+
+    public function handle(TenantService $tenantService)
+    {
+        $tenants = config('tenants.tenants');
+        
+        $this->info("1. PROCESSING PUBLIC SCHEMA...");
+        
+        // Сбрасываем контекст на Public
+        DB::statement("SET search_path TO public");
+        
+        // 1. Накатываем структуру Public
+        if ($this->option('fresh')) {
+            $this->call('migrate:fresh', [
+                '--force' => true,
+                '--path' => 'database/migrations',
+            ]);
+        } else {
+            $this->call('migrate', [
+                '--force' => true,
+                '--path' => 'database/migrations',
+            ]);
+        }
+
+        // 2. ИСПРАВЛЕНИЕ: Сеем Public схему (создаем Админа) СРАЗУ
+        if ($this->option('seed')) {
+            $this->info("Seeding PUBLIC schema...");
+            $this->call('db:seed', ['--force' => true]); 
+            // DatabaseSeeder увидит, что tenant не переключен, и создаст Админа.
+        }
+
+        // 3. Обработка Тенантов
+        foreach ($tenants as $tenantId => $config) {
+            $this->info("---------------------------------------");
+            $this->info("2. PROCESSING TENANT: {$config['name']} ($tenantId)");
+
+            DB::statement("CREATE SCHEMA IF NOT EXISTS \"{$tenantId}\"");
+
+            $tenantService->switchTenant($tenantId);
+
+            $this->call('migrate', [
+                '--force' => true,
+                '--path' => 'database/migrations',
+            ]);
+
+            if ($this->option('seed')) {
+                $this->info("Seeding tenant {$tenantId}...");
+                $this->call('db:seed', ['--force' => true]);
+            }
+        }
+
+        $this->info("---------------------------------------");
+        $this->info("✅ All operations completed successfully.");
+    }
+}
+</file>
+
+<file path="app/Console/Commands/TenantsStorageLinkCommand.php">
+<?php
+// FILE: app/Console/Commands/TenantsStorageLinkCommand.php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
+
+class TenantsStorageLinkCommand extends Command
+{
+    protected $signature = 'tenants:link';
+    protected $description = 'Create symbolic links for tenants (public/tenants/{id} -> storage/tenants/{id})';
+
+    public function handle()
+    {
+        $tenants = config('tenants.tenants');
+        
+        // Создаем папку-контейнер в public, если нет
+        if (!File::exists(public_path('tenants'))) {
+            File::makeDirectory(public_path('tenants'), 0755, true);
+        }
+
+        foreach ($tenants as $id => $config) {
+            // Цель: storage/tenants/{id}/media
+            // Мы линкуем корень тенанта или конкретно media. 
+            // Для удобства слинкуем корень тенанта, чтобы иметь доступ и к другим публичным папкам если понадобятся.
+            
+            $target = storage_path("tenants/{$id}"); 
+            $link = public_path("tenants/{$id}");
+
+            // 1. Создаем целевую папку в storage, если её нет
+            if (!File::exists($target)) {
+                 $this->warn("Target directory [{$target}] does not exist. Creating...");
+                 // force creation
+                 File::makeDirectory($target, 0777, true);
+                 // Создаем внутри media для порядка
+                 File::makeDirectory($target . '/media', 0777, true); 
+            }
+
+            // 2. Если ссылка уже есть — пропускаем
+            if (File::exists($link)) {
+                $this->info("The [{$link}] link already exists.");
+                continue;
+            }
+
+            // 3. Создаем симлинк
+            try {
+                $this->laravel->make('files')->link($target, $link);
+                $this->info("Connected: [public/tenants/{$id}] -> [storage/tenants/{id}]");
+            } catch (\Exception $e) {
+                $this->error("Failed to link {$id}: " . $e->getMessage());
+            }
+        }
+
+        $this->info('All tenant links processed.');
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/AttributeController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/AttributeController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\AttributeOption;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+class AttributeController extends Controller
+{
+    public function index()
+    {
+        // Группируем опции по типу (size, product_type)
+        $attributes = AttributeOption::all()->groupBy('type');
+        return view('admin.attributes.index', compact('attributes'));
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'type' => 'required|string|in:size,product_type,material',
+            'value' => 'required|string|max:255',
+        ]);
+
+        AttributeOption::firstOrCreate(
+            ['type' => $validated['type'], 'value' => $validated['value']],
+            ['slug' => Str::slug($validated['value'])]
+        );
+
+        return back()->with('success', 'Attribute option added.');
+    }
+
+    public function destroy($id)
+    {
+        AttributeOption::destroy($id);
+        return back()->with('success', 'Attribute option deleted.');
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/AuthController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/AuthController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class AuthController extends Controller
+{
+    public function showLoginForm()
+    {
+        if (Auth::check()) {
+            return redirect()->route('admin.dashboard');
+        }
+        return view('admin.auth.login');
+    }
+
+    public function login(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+
+        // Попытка входа в ТЕКУЩЕЙ схеме
+        // Так как Админ теперь есть везде, это сработает и для админа, и для менеджера
+        if (Auth::attempt($credentials)) {
+            $request->session()->regenerate();
+
+            $user = Auth::user();
+            
+            // Сохраняем флаг супер-админа в сессию для удобства в Blade
+            if ($user->role === 'super_admin') {
+                $request->session()->put('is_super_admin', true);
+            } else {
+                $request->session()->put('is_super_admin', false);
+            }
+
+            return redirect()->route('admin.dashboard');
+        }
+
+        return back()->withErrors([
+            'email' => 'The provided credentials do not match our records.',
+        ]);
+    }
+
+    public function logout(Request $request)
+    {
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        return redirect()->route('admin.login');
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/CategoryController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/CategoryController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Services\TenantService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+class CategoryController extends Controller
+{
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
+    {
+        $this->tenantService = $tenantService;
+    }
+
+    public function index()
+    {
+        // Проверка контекста для супер-админа
+        if (auth()->user()->role === 'super_admin' && !$this->tenantService->getCurrentTenantId()) {
+            return view('admin.products.select_tenant'); // Используем тот же вью выбора
+        }
+
+        $categories = Category::withCount('products')->get();
+        return view('admin.categories.index', compact('categories'));
+    }
+
+    public function create()
+    {
+        return view('admin.categories.create');
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        Category::create([
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']),
+        ]);
+
+        return redirect()->route('admin.categories.index')->with('success', 'Category created.');
+    }
+
+    public function destroy($id)
+    {
+        Category::destroy($id);
+        return back()->with('success', 'Category deleted.');
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/DashboardController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/DashboardController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Services\TenantService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class DashboardController extends Controller
+{
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
+    {
+        $this->tenantService = $tenantService;
+    }
+
+    public function index(Request $request)
+    {
+        $isSuperAdmin = $request->session()->get('is_super_admin', false);
+        $currentTenant = $this->tenantService->getCurrentTenantId();
+        
+        // Если Супер-админ передал ?switch_tenant=xxx, переключаем его
+        if ($isSuperAdmin && $request->has('switch_tenant')) {
+            $target = $request->get('switch_tenant');
+            return redirect()->to("http://{$target}." . config('app.url_base', 'trishop.local') . "/admin");
+            // В реальном продакшене лучше использовать сессию или cookie для подмены контекста без редиректа на домен,
+            // но редирект на домен — самый надежный способ изолировать сессии менеджеров.
+        }
+
+        // Статистика
+        $totalOrders = Order::count();
+        $totalRevenue = Order::sum('total_amount');
+        $recentOrders = Order::latest()->take(5)->get();
+
+        return view('admin.dashboard', compact(
+            'isSuperAdmin', 
+            'currentTenant', 
+            'totalOrders', 
+            'totalRevenue', 
+            'recentOrders'
+        ));
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/OrderController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/OrderController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\TenantSetting;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+
+class OrderController extends Controller
+{
+    public function index()
+    {
+        $orders = Order::latest()->paginate(20);
+        return view('admin.orders.index', compact('orders'));
+    }
+
+    public function show($id)
+    {
+        $order = Order::findOrFail($id);
+        return view('admin.orders.show', compact('order'));
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $order = Order::findOrFail($id);
+        $order->update(['status' => $request->status]);
+
+        // ПРИМЕР ИНТЕГРАЦИИ: Если статус 'shipped', создаем накладную (заглушка)
+        if ($request->status === 'shipped') {
+            $this->createDeliveryLabel($order);
+        }
+
+        return back()->with('success', 'Order status updated');
+    }
+
+    // Заглушка отправки в Telegram
+    public function sendNotification($id)
+    {
+        $order = Order::findOrFail($id);
+        
+        // 1. Получаем настройки текущего магазина из БД
+        $chatId = TenantSetting::get('telegram_chat_id');
+        
+        if (!$chatId) {
+            return back()->with('error', 'Telegram Chat ID not configured for this store.');
+        }
+
+        // 2. Логика отправки (здесь был бы запрос к Telegram API)
+        // Http::post("https://api.telegram.org/bot<TOKEN>/sendMessage", ...)
+        
+        Log::info("TELEGRAM SENT to {$chatId}: Order {$order->order_number} created.");
+
+        return back()->with('success', "Notification sent to Chat ID: {$chatId}");
+    }
+
+    // Заглушка создания ТТН (Новая Почта)
+    private function createDeliveryLabel(Order $order)
+    {
+        $apiKey = TenantSetting::get('novaposhta_api_key');
+        if (!$apiKey) {
+            Log::warning("Nova Poshta API Key missing for tenant.");
+            return;
+        }
+        Log::info("NOVA POSHTA API call with key {$apiKey} for Order {$order->order_number}");
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/ProductController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/ProductController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\AttributeOption;
+use App\Services\ProductService;
+use App\Services\TenantService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+class ProductController extends Controller
+{
+    protected TenantService $tenantService;
+    protected ProductService $productService;
+
+    public function __construct(TenantService $tenantService, ProductService $productService)
+    {
+        $this->tenantService = $tenantService;
+        $this->productService = $productService;
+    }
+
+    private function checkContext()
+    {
+        if (auth()->user()->role === 'super_admin' && !$this->tenantService->getCurrentTenantId()) {
+            return false;
+        }
+        return true;
+    }
+
+    public function index()
+    {
+        if (!$this->checkContext()) return view('admin.products.select_tenant');
+        // Подгружаем категории для отображения в списке
+        $products = Product::with('categories')->latest()->paginate(10);
+        return view('admin.products.index', compact('products'));
+    }
+
+    public function create()
+    {
+        if (!$this->checkContext()) return view('admin.products.select_tenant');
+        
+        $categories = Category::all();
+        // Загружаем доступные опции для подсказок
+        $sizes = AttributeOption::where('type', 'size')->get();
+        $types = AttributeOption::where('type', 'product_type')->get();
+
+        return view('admin.products.create', compact('categories', 'sizes', 'types'));
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            // categories теперь массив, может содержать ID или строки (новые названия)
+            'categories' => 'required|array', 
+            'stock_quantity' => 'required|integer|min:0',
+            'sku' => 'required|string|max:50|unique:products,sku', 
+            'image' => 'nullable|image|max:2048',
+            // Атрибуты тоже могут быть новыми
+            'attributes_type' => 'required|string', 
+            'attributes_size' => 'nullable|array', 
+        ]);
+
+        // 1. Обработка КАТЕГОРИЙ (Create on fly)
+        $categoryIds = [];
+        foreach ($request->categories as $input) {
+            if (is_numeric($input)) {
+                $categoryIds[] = $input;
+            } else {
+                // Это новая категория (строка)
+                $newCat = Category::firstOrCreate(
+                    ['name' => $input],
+                    ['slug' => Str::slug($input)]
+                );
+                $categoryIds[] = $newCat->id;
+            }
+        }
+
+        // 2. Обработка ТИПА ПРОДУКТА (Справочник)
+        $typeName = $request->attributes_type;
+        AttributeOption::firstOrCreate(
+            ['type' => 'product_type', 'value' => $typeName],
+            ['slug' => Str::slug($typeName)]
+        );
+
+        // 3. Обработка РАЗМЕРОВ (Справочник)
+        $sizes = $request->attributes_size ?? [];
+        foreach ($sizes as $sizeName) {
+            AttributeOption::firstOrCreate(
+                ['type' => 'size', 'value' => $sizeName],
+                ['slug' => Str::slug($sizeName)]
+            );
+        }
+
+        // 4. Картинка
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('media', 'tenant');
+        }
+
+        // 5. Создание товара
+        $product = $this->productService->create([
+            'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']) . '-' . Str::random(4),
+            'price' => $validated['price'],
+            'sku' => $validated['sku'],
+            'stock_quantity' => $validated['stock_quantity'],
+            'description' => $request->input('description'),
+            'image_path' => $imagePath,
+            'attributes' => [
+                'type' => $typeName,
+                'size' => $sizes,
+            ]
+        ]);
+
+        // 6. Привязка категорий
+        $product->categories()->sync($categoryIds);
+
+        return redirect()->route('admin.products.index')->with('success', 'Product created with dynamic attributes.');
+    }
+
+    public function edit($id)
+    {
+        if (!$this->checkContext()) return view('admin.products.select_tenant');
+
+        $product = Product::with('categories')->findOrFail($id);
+        $categories = Category::all();
+        $sizes = AttributeOption::where('type', 'size')->get();
+        $types = AttributeOption::where('type', 'product_type')->get();
+        
+        $tenantDomain = config('tenants.tenants.' . $this->tenantService->getCurrentTenantId() . '.domain');
+        $previewUrl = "http://{$tenantDomain}/products/{$product->slug}?preview=true";
+
+        return view('admin.products.edit', compact('product', 'categories', 'previewUrl', 'sizes', 'types'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        if (!$this->checkContext()) return view('admin.products.select_tenant');
+        
+        $product = Product::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'categories' => 'required|array',
+            'stock_quantity' => 'required|integer|min:0',
+            'sku' => 'required|string|max:50',
+            'image' => 'nullable|image|max:2048',
+            'attributes_type' => 'required|string', 
+            'attributes_size' => 'nullable|array', 
+        ]);
+
+        // Обработка Категорий
+        $categoryIds = [];
+        foreach ($request->categories as $input) {
+            if (is_numeric($input)) {
+                $categoryIds[] = $input;
+            } else {
+                $newCat = Category::firstOrCreate(['name' => $input], ['slug' => Str::slug($input)]);
+                $categoryIds[] = $newCat->id;
+            }
+        }
+
+        // Обработка Атрибутов
+        $typeName = $request->attributes_type;
+        AttributeOption::firstOrCreate(['type' => 'product_type', 'value' => $typeName], ['slug' => Str::slug($typeName)]);
+        
+        $sizes = $request->attributes_size ?? [];
+        foreach ($sizes as $sizeName) {
+            AttributeOption::firstOrCreate(['type' => 'size', 'value' => $sizeName], ['slug' => Str::slug($sizeName)]);
+        }
+
+        // Картинка
+        if ($request->hasFile('image')) {
+            if ($product->image_path) {
+                Storage::disk('tenant')->delete($product->image_path);
+            }
+            $product->image_path = $request->file('image')->store('media', 'tenant');
+        }
+
+        $product->update([
+            'name' => $validated['name'],
+            'price' => $validated['price'],
+            'sku' => $validated['sku'],
+            'stock_quantity' => $validated['stock_quantity'],
+            'description' => $request->input('description'),
+            'attributes' => [
+                'type' => $typeName,
+                'size' => $sizes,
+            ]
+        ]);
+
+        $product->categories()->sync($categoryIds);
+
+        return redirect()->route('admin.products.index')->with('success', 'Product updated.');
+    }
+
+    public function destroy($id)
+    {
+        if (!$this->checkContext()) return view('admin.products.select_tenant');
+        
+        $product = Product::findOrFail($id);
+        if ($product->image_path) Storage::disk('tenant')->delete($product->image_path);
+        $product->delete();
+        return redirect()->route('admin.products.index')->with('success', 'Product deleted.');
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/ReportController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/ReportController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Services\TenantService;
+use Illuminate\Support\Facades\DB;
+
+class ReportController extends Controller
+{
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
+    {
+        $this->tenantService = $tenantService;
+    }
+
+    public function index()
+    {
+        $user = auth()->user();
+        $reportData = [];
+        $grandTotal = 0;
+
+        // ЛОГИКА СУПЕР-АДМИНА: Пробегаем по всем схемам
+        if ($user->role === 'super_admin') {
+            $tenants = config('tenants.tenants');
+            
+            foreach ($tenants as $id => $config) {
+                // Переключаем контекст БД
+                // Важно: try-catch, чтобы ошибка в одной схеме не положила весь отчет
+                try {
+                    $this->tenantService->switchTenant($id);
+                    
+                    $total = Order::sum('total_amount');
+                    $count = Order::count();
+                    $avg = $count > 0 ? $total / $count : 0;
+
+                    $reportData[] = [
+                        'tenant' => $config['name'],
+                        'orders_count' => $count,
+                        'total_revenue' => $total,
+                        'average_check' => $avg,
+                    ];
+                    $grandTotal += $total;
+
+                } catch (\Exception $e) {
+                    $reportData[] = [
+                        'tenant' => $config['name'] . ' (Error)',
+                        'orders_count' => 0,
+                        'total_revenue' => 0,
+                        'average_check' => 0,
+                    ];
+                }
+            }
+            
+            // Возвращаемся в Public (или в контекст админки по умолчанию)
+            DB::statement("SET search_path TO public");
+
+        } else {
+            // ЛОГИКА МЕНЕДЖЕРА: Данные только текущей схемы
+            // Middleware уже переключил нас в нужную схему при входе (если мы в режиме магазина)
+            // Но так как мы в центральной админке, нам нужно убедиться, что контекст верен.
+            
+            if ($user->tenant_id) {
+                $this->tenantService->switchTenant($user->tenant_id);
+                
+                $total = Order::sum('total_amount');
+                $count = Order::count();
+                $avg = $count > 0 ? $total / $count : 0;
+
+                $reportData[] = [
+                    'tenant' => ucfirst($user->tenant_id),
+                    'orders_count' => $count,
+                    'total_revenue' => $total,
+                    'average_check' => $avg,
+                ];
+                $grandTotal = $total;
+            }
+        }
+
+        return view('admin.reports.index', compact('reportData', 'grandTotal'));
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/SettingsController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/SettingsController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\TenantSetting;
+use Illuminate\Http\Request;
+
+class SettingsController extends Controller
+{
+    public function index()
+    {
+        $settings = TenantSetting::all()->pluck('value', 'key');
+        return view('admin.settings.index', compact('settings'));
+    }
+
+    public function update(Request $request)
+    {
+        $data = $request->except('_token');
+        
+        foreach ($data as $key => $value) {
+            TenantSetting::set($key, $value);
+        }
+
+        return back()->with('success', 'Settings saved successfully.');
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Api/ProductController.php">
+<?php
+// FILE: app/Http/Controllers/Api/ProductController.php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Product;
+use App\Services\ProductService;
+use Illuminate\Http\Request;
+
+class ProductController extends Controller
+{
+    protected ProductService $productService;
+
+    public function __construct(ProductService $productService)
+    {
+        $this->productService = $productService;
+    }
+
+    // GET /api/products
+    public function index()
+    {
+        return response()->json(Product::latest()->paginate(12));
+    }
+
+    // GET /api/products/{id}
+    public function show($id)
+    {
+        $product = Product::findOrFail($id);
+        return response()->json($product);
+    }
+
+    // GET /api/products/search?q=hoodie
+    public function search(Request $request)
+    {
+        $query = $request->get('q');
+        
+        if (!$query) {
+            return $this->index();
+        }
+
+        $products = $this->productService->search($query);
+        return response()->json($products);
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Controller.php">
+<?php
+
+namespace App\Http\Controllers;
+
+abstract class Controller
+{
+    //
+}
+</file>
+
+<file path="app/Http/Middleware/TenantMiddleware.php">
+<?php
+// FILE: app/Http/Middleware/TenantMiddleware.php
+
+declare(strict_types=1);
+
+namespace App\Http\Middleware;
+
+use App\Services\TenantService;
+use Closure;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB; // Добавлено
+use Symfony\Component\HttpFoundation\Response;
+
+class TenantMiddleware
+{
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
+    {
+        $this->tenantService = $tenantService;
+    }
+
+    public function handle(Request $request, Closure $next): Response
+    {
+        $host = $request->getHost();
+        $adminDomain = config('tenants.admin_domain');
+
+        // РЕЖИМ 1: АДМИНКА
+        if ($host === $adminDomain) {
+            // ИСПРАВЛЕНИЕ: Принудительно ставим public по умолчанию
+            // Это гарантирует, что Auth будет искать юзера в public.users
+            DB::statement("SET search_path TO public");
+
+            // Если Супер-Админ выбрал магазин "посмотреть", переключаем ТОЛЬКО для данных
+            // Но это должно быть аккуратно реализовано в контроллерах. 
+            // Для входа (Login) критически важно быть в public.
+            
+            if (session()->has('admin_current_tenant_id')) {
+                try {
+                    $targetTenant = session('admin_current_tenant_id');
+                    // Важно: switchTenant меняет search_path.
+                    // Для корректной работы админки нам нужно:
+                    // 1. Auth -> Public schema
+                    // 2. Orders -> Tenant schema
+                    // Это сложно. Упростим: если мы логинимся (маршрут login), мы форсируем public.
+                    
+                    if (!$request->routeIs('admin.login')) {
+                         $this->tenantService->switchTenant($targetTenant);
+                    }
+                } catch (\Exception $e) {
+                    session()->forget('admin_current_tenant_id');
+                }
+            }
+            
+            return $next($request);
+        }
+
+        // РЕЖИМ 2: МАГАЗИНЫ
+        $domainMap = $this->tenantService->getDomainMap();
+
+        if (array_key_exists($host, $domainMap)) {
+            $tenantId = $domainMap[$host];
+            try {
+                $this->tenantService->switchTenant($tenantId);
+            } catch (\Exception $e) {
+                abort(500, "Tenant switch failed: " . $e->getMessage());
+            }
+
+            return $next($request);
+        }
+
+        abort(404, "Site not found for domain: {$host}");
+    }
+}
+</file>
+
+<file path="app/Models/AttributeOption.php">
+<?php
+// FILE: app/Models/AttributeOption.php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class AttributeOption extends Model
+{
+    protected $fillable = ['type', 'value', 'slug'];
+}
+</file>
+
+<file path="app/Models/Category.php">
+<?php
+// FILE: app/Models/Category.php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Category extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['name', 'slug'];
+
+    public function products()
+    {
+        return $this->belongsToMany(Product::class);
+    }
+}
+</file>
+
+<file path="app/Models/Order.php">
+<?php
+// FILE: app/Models/Order.php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Order extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'order_number',
+        'total_amount',
+        'status',
+        'customer_email',
+        'customer_name',
+        'items',
+    ];
+
+    protected $casts = [
+        'items' => 'array',
+        'total_amount' => 'decimal:2',
+    ];
+}
+</file>
+
+<file path="app/Models/TenantSetting.php">
+<?php
+// FILE: app/Models/TenantSetting.php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class TenantSetting extends Model
+{
+    protected $fillable = ['key', 'value', 'group'];
+
+    // Хелпер для получения настройки
+    public static function get(string $key, $default = null)
+    {
+        return self::where('key', $key)->value('value') ?? $default;
+    }
+
+    // Хелпер для сохранения
+    public static function set(string $key, $value, string $group = 'general')
+    {
+        return self::updateOrCreate(
+            ['key' => $key],
+            ['value' => $value, 'group' => $group]
+        );
+    }
+}
+</file>
+
+<file path="app/Models/User.php">
+<?php
+// FILE: app/Models/User.php
+
+namespace App\Models;
+
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable
+{
+    use HasFactory, Notifiable;
+
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'role',      // super_admin, manager
+        'tenant_id', // Привязка к конкретному магазину (null для супер-админа)
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    // Хелпер для проверки доступа
+    public function hasAccessToTenant(string $tenantId): bool
+    {
+        if ($this->role === 'super_admin') {
+            return true;
+        }
+        return $this->tenant_id === $tenantId;
+    }
+}
+</file>
+
+<file path="app/Providers/AppServiceProvider.php">
+<?php
+// FILE: app/Providers/AppServiceProvider.php
+
+namespace App\Providers;
+
+use App\Services\TenantService;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        // ВАЖНО: Регистрируем TenantService как Singleton.
+        // Это гарантирует, что данные, установленные в Middleware,
+        // будут доступны в Контроллере.
+        $this->app->singleton(TenantService::class, function ($app) {
+            return new TenantService();
+        });
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        //
+    }
+}
+</file>
+
+<file path="app/Services/CartService.php">
+<?php
+// FILE: app/Services/CartService.php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\Product;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Session;
+
+class CartService
+{
+    // 2 часа жизни корзины
+    private const TTL = 7200;
+
+    private function getCartKey(): string
+    {
+        // Используем ID сессии как идентификатор корзины пользователя
+        $sessionId = Session::getId();
+        return "cart:{$sessionId}";
+    }
+
+    public function add(int $productId, int $quantity = 1): void
+    {
+        $product = Product::findOrFail($productId);
+        $key = $this->getCartKey();
+        
+        // Получаем текущую корзину
+        $cart = $this->get();
+        
+        if (isset($cart[$productId])) {
+            $cart[$productId]['quantity'] += $quantity;
+        } else {
+            $cart[$productId] = [
+                'id' => $product->id,
+                'name' => $product->name,
+                'price' => $product->price,
+                'quantity' => $quantity,
+            ];
+        }
+
+        Redis::setex($key, self::TTL, json_encode($cart));
+    }
+
+    public function get(): array
+    {
+        $key = $this->getCartKey();
+        $data = Redis::get($key);
+        return $data ? json_decode($data, true) : [];
+    }
+
+    public function clear(): void
+    {
+        Redis::del($this->getCartKey());
+    }
+
+    public function total(): float
+    {
+        $cart = $this->get();
+        $total = 0;
+        foreach ($cart as $item) {
+            $total += $item['price'] * $item['quantity'];
+        }
+        return $total;
+    }
+}
+</file>
+
+<file path="app/Services/ProductService.php">
+<?php
+// FILE: app/Services/ProductService.php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\Product;
+use Illuminate\Support\Facades\DB;
+
+class ProductService
+{
+    protected SearchService $searchService;
+
+    public function __construct(SearchService $searchService)
+    {
+        $this->searchService = $searchService;
+    }
+
+    public function create(array $data): Product
+    {
+        return DB::transaction(function () use ($data) {
+            // 1. Сохраняем в PostgreSQL
+            $product = Product::create($data);
+
+            // 2. Индексируем в Elastic (можно вынести в Job/Queue для скорости, но пока делаем синхронно)
+            try {
+                $this->searchService->indexProduct($product);
+            } catch (\Exception $e) {
+                // Логируем, но не ломаем создание товара, если Elastic недоступен
+                // В продакшене здесь нужен механизм ретраев
+                \Illuminate\Support\Facades\Log::error("Failed to index product {$product->id}: " . $e->getMessage());
+            }
+
+            return $product;
+        });
+    }
+    
+    public function search(string $query): \Illuminate\Database\Eloquent\Collection
+    {
+        // 1. Получаем ID из Elastic
+        $ids = $this->searchService->search($query);
+
+        if (empty($ids)) {
+            return new \Illuminate\Database\Eloquent\Collection();
+        }
+
+        // 2. Загружаем модели из базы в правильном порядке
+        // FIELD(id, ...) нужен чтобы сохранить релевантность сортировки Elastic
+        $idsString = implode(',', $ids);
+        return Product::whereIn('id', $ids)
+            ->orderByRaw("array_position(ARRAY[{$idsString}], id)") // PostgreSQL синтаксис
+            ->get();
+    }
+}
+</file>
+
+<file path="app/Services/SearchService.php">
+<?php
+// FILE: app/Services/SearchService.php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\Product;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+class SearchService
+{
+    protected string $host;
+    protected string $port;
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
+    {
+        $this->tenantService = $tenantService;
+        $this->host = config('services.elasticsearch.host', 'elasticsearch');
+        $this->port = config('services.elasticsearch.port', '9200');
+    }
+
+    /**
+     * Получить имя индекса для текущего магазина (напр. street_style_products)
+     */
+    protected function getIndexName(): string
+    {
+        $tenantId = $this->tenantService->getCurrentTenantId();
+        if (!$tenantId) {
+            throw new \RuntimeException("Cannot determine index name: no tenant active.");
+        }
+        return "{$tenantId}_products";
+    }
+
+    protected function getUrl(string $endpoint): string
+    {
+        return "http://{$this->host}:{$this->port}/{$endpoint}";
+    }
+
+    /**
+     * Создать индекс с маппингом (если не существует)
+     */
+    public function createIndexIfNotExists(): void
+    {
+        $index = $this->getIndexName();
+        $url = $this->getUrl($index);
+
+        // Проверяем существование (HEAD запрос)
+        $exists = Http::head($url)->successful();
+
+        if (!$exists) {
+            $response = Http::put($url, [
+                'mappings' => [
+                    'properties' => [
+                        'name' => ['type' => 'text'],
+                        'description' => ['type' => 'text'],
+                        'category' => ['type' => 'keyword'],
+                        'price' => ['type' => 'float'],
+                        'sku' => ['type' => 'keyword'],
+                        'tenant_id' => ['type' => 'keyword'],
+                    ]
+                ]
+            ]);
+            
+            Log::info("Created Elasticsearch index: {$index}", ['status' => $response->status()]);
+        }
+    }
+
+    /**
+     * Индексация товара
+     */
+    public function indexProduct(Product $product): bool
+    {
+        $this->createIndexIfNotExists(); // Ленивая инициализация
+
+        $index = $this->getIndexName();
+        $url = $this->getUrl("{$index}/_doc/{$product->id}");
+
+        $response = Http::post($url, [
+            'id' => $product->id,
+            'name' => $product->name,
+            'description' => $product->description,
+            'price' => (float) $product->price,
+            'category' => $product->category,
+            'sku' => $product->sku,
+            'created_at' => $product->created_at->toIso8601String(),
+        ]);
+
+        return $response->successful();
+    }
+
+    /**
+     * Поиск товаров
+     */
+    public function search(string $query, int $limit = 20): array
+    {
+        $index = $this->getIndexName();
+        $url = $this->getUrl("{$index}/_search");
+
+        $body = [
+            'size' => $limit,
+            'query' => [
+                'multi_match' => [
+                    'query' => $query,
+                    'fields' => ['name^3', 'description', 'sku'], // Name имеет приоритет x3
+                    'fuzziness' => 'AUTO' // Обработка опечаток
+                ]
+            ]
+        ];
+
+        $response = Http::post($url, $body);
+
+        if (!$response->successful()) {
+            Log::error("Elasticsearch search failed", ['body' => $response->body()]);
+            return [];
+        }
+
+        $hits = $response->json('hits.hits');
+        
+        // Возвращаем просто массив ID, чтобы контроллер загрузил модели из БД
+        return array_map(fn($hit) => $hit['_id'], $hits);
+    }
+    
+    /**
+     * Удалить индекс (для полного сброса)
+     */
+    public function deleteIndex(): void
+    {
+        try {
+            $index = $this->getIndexName();
+            Http::delete($this->getUrl($index));
+        } catch (\Exception $e) {
+            // Игнорируем, если индекса нет или мы вне контекста
+        }
+    }
+}
+</file>
+
+<file path="app/Services/TenantService.php">
+<?php
+// FILE: app/Services/TenantService.php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
+
+class TenantService
+{
+    private ?string $currentTenantId = null;
+
+    /**
+     * Переключает контекст приложения на указанного тенанта (схему БД).
+     */
+    public function switchTenant(string $tenantId): void
+    {
+        // 1. Проверка существования конфигурации
+        $tenantConfig = config("tenants.tenants.{$tenantId}");
+        if (!$tenantConfig) {
+            throw new \Exception("Tenant {$tenantId} not found in config.");
+        }
+
+        $this->currentTenantId = $tenantId;
+
+        // 2. Переключение PostgreSQL (Schema)
+        // Мы меняем search_path. Это заставляет Postgres искать таблицы сначала в схеме тенанта.
+        // public добавляем в конец, чтобы были доступны общие таблицы (если понадобятся).
+        DB::purge('pgsql'); // Закрываем старое соединение
+        Config::set('database.connections.pgsql.search_path', "{$tenantId}, public");
+        DB::reconnect('pgsql'); // Открываем новое с новыми настройками
+
+        // 3. Настройка файловой системы
+        // Путь будет: storage/tenants/{tenant_id}/
+        Config::set('filesystems.disks.tenant.root', storage_path("tenants/{$tenantId}"));
+        Config::set('filesystems.disks.tenant.url', env('APP_URL') . "/storage/tenants/{$tenantId}");
+
+        // 4. Настройка Redis (Prefix)
+        // Чтобы ключи кэша разных магазинов не пересекались
+        Config::set('database.redis.options.prefix', "trishop_{$tenantId}_");
+        // Пересоздаем фасад Redis, чтобы он подхватил новый префикс (если соединение уже было открыто)
+        try {
+            Redis::connection()->disconnect();
+        } catch (\Exception $e) {
+            // Игнорируем ошибку отключения, если соединения не было
+        }
+
+        // Логируем переключение (полезно для отладки)
+        Log::info("Switched to tenant: {$tenantId}");
+    }
+
+    /**
+     * Возвращает ID текущего тенанта или null, если мы в глобальной зоне (public).
+     */
+    public function getCurrentTenantId(): ?string
+    {
+        return $this->currentTenantId;
+    }
+
+    /**
+     * Получить список всех доменов для Middleware
+     */
+    public function getDomainMap(): array
+    {
+        $map = [];
+        foreach (config('tenants.tenants') as $id => $data) {
+            $map[$data['domain']] = $id;
+        }
+        return $map;
+    }
+}
+</file>
+
+<file path="artisan">
+#!/usr/bin/env php
+<?php
+
+use Illuminate\Foundation\Application;
+use Symfony\Component\Console\Input\ArgvInput;
+
+define('LARAVEL_START', microtime(true));
+
+// Register the Composer autoloader...
+require __DIR__.'/vendor/autoload.php';
+
+// Bootstrap Laravel and handle the command...
+/** @var Application $app */
+$app = require_once __DIR__.'/bootstrap/app.php';
+
+$status = $app->handleCommand(new ArgvInput);
+
+exit($status);
+</file>
+
+<file path="bootstrap/cache/.gitignore">
+*
+!.gitignore
+</file>
+
+<file path="bootstrap/app.php">
+<?php
+// FILE: bootstrap/app.php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        commands: __DIR__.'/../routes/console.php',
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware) {
+        // 1. Подключаем TenantMiddleware
+        // ИСПОЛЬЗУЕМ PREPEND ВМЕСТО APPEND
+        // Это важно! Middleware должен запуститься ДО старта сессии (StartSession),
+        // чтобы настройка префикса Redis применилась к драйверу сессий.
+        $middleware->web(prepend: [
+            \App\Http\Middleware\TenantMiddleware::class,
+        ]);
+
+        // 2. Если ГОСТЬ пытается зайти в админку -> редирект на Логин
+        $middleware->redirectGuestsTo(function (Request $request) {
+            return route('admin.login');
+        });
+
+        // 3. Если АВТОРИЗОВАННЫЙ пытается открыть Логин -> редирект в Дашборд
+        $middleware->redirectUsersTo(function (Request $request) {
+            return route('admin.dashboard');
+        });
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        //
+    })->create();
+</file>
+
+<file path="bootstrap/providers.php">
+<?php
+
+return [
+    App\Providers\AppServiceProvider::class,
+];
+</file>
+
+<file path="composer.json">
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "laravel/laravel",
+    "type": "project",
+    "description": "The skeleton application for the Laravel framework.",
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "laravel/framework": "^12.0",
+        "laravel/tinker": "^2.10.1"
+    },
+    "require-dev": {
+        "fakerphp/faker": "^1.23",
+        "laravel/pail": "^1.2.2",
+        "laravel/pint": "^1.24",
+        "laravel/sail": "^1.41",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.6",
+        "phpunit/phpunit": "^11.5.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate",
+            "@php artisan migrate --force",
+            "npm install",
+            "npm run build"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+        ],
+        "test": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test"
+        ],
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "@php artisan migrate --graceful --ansi"
+        ],
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
+</file>
+
+<file path="config/app.php">
+<?php
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Name
+    |--------------------------------------------------------------------------
+    |
+    | This value is the name of your application, which will be used when the
+    | framework needs to place the application's name in a notification or
+    | other UI elements where an application name needs to be displayed.
+    |
+    */
+
+    'name' => env('APP_NAME', 'Laravel'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Environment
+    |--------------------------------------------------------------------------
+    |
+    | This value determines the "environment" your application is currently
+    | running in. This may determine how you prefer to configure various
+    | services the application utilizes. Set this in your ".env" file.
+    |
+    */
+
+    'env' => env('APP_ENV', 'production'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Debug Mode
+    |--------------------------------------------------------------------------
+    |
+    | When your application is in debug mode, detailed error messages with
+    | stack traces will be shown on every error that occurs within your
+    | application. If disabled, a simple generic error page is shown.
+    |
+    */
+
+    'debug' => (bool) env('APP_DEBUG', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application URL
+    |--------------------------------------------------------------------------
+    |
+    | This URL is used by the console to properly generate URLs when using
+    | the Artisan command line tool. You should set this to the root of
+    | the application so that it's available within Artisan commands.
+    |
+    */
+
+    'url' => env('APP_URL', 'http://localhost'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Here you may specify the default timezone for your application, which
+    | will be used by the PHP date and date-time functions. The timezone
+    | is set to "UTC" by default as it is suitable for most use cases.
+    |
+    */
+
+    'timezone' => 'UTC',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Locale Configuration
+    |--------------------------------------------------------------------------
+    |
+    | The application locale determines the default locale that will be used
+    | by Laravel's translation / localization methods. This option can be
+    | set to any locale for which you plan to have translation strings.
+    |
+    */
+
+    'locale' => env('APP_LOCALE', 'en'),
+
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+
+    'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Encryption Key
+    |--------------------------------------------------------------------------
+    |
+    | This key is utilized by Laravel's encryption services and should be set
+    | to a random, 32 character string to ensure that all encrypted values
+    | are secure. You should do this prior to deploying the application.
+    |
+    */
+
+    'cipher' => 'AES-256-CBC',
+
+    'key' => env('APP_KEY'),
+
+    'previous_keys' => [
+        ...array_filter(
+            explode(',', (string) env('APP_PREVIOUS_KEYS', ''))
+        ),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Maintenance Mode Driver
+    |--------------------------------------------------------------------------
+    |
+    | These configuration options determine the driver used to determine and
+    | manage Laravel's "maintenance mode" status. The "cache" driver will
+    | allow maintenance mode to be controlled across multiple machines.
+    |
+    | Supported drivers: "file", "cache"
+    |
+    */
+
+    'maintenance' => [
+        'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
+        'store' => env('APP_MAINTENANCE_STORE', 'database'),
+    ],
+
+];
+</file>
+
+<file path="config/auth.php">
+<?php
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication Defaults
+    |--------------------------------------------------------------------------
+    |
+    | This option defines the default authentication "guard" and password
+    | reset "broker" for your application. You may change these values
+    | as required, but they're a perfect start for most applications.
+    |
+    */
+
+    'defaults' => [
+        'guard' => env('AUTH_GUARD', 'web'),
+        'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication Guards
+    |--------------------------------------------------------------------------
+    |
+    | Next, you may define every authentication guard for your application.
+    | Of course, a great default configuration has been defined for you
+    | which utilizes session storage plus the Eloquent user provider.
+    |
+    | All authentication guards have a user provider, which defines how the
+    | users are actually retrieved out of your database or other storage
+    | system used by the application. Typically, Eloquent is utilized.
+    |
+    | Supported: "session"
+    |
+    */
+
+    'guards' => [
+        'web' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | User Providers
+    |--------------------------------------------------------------------------
+    |
+    | All authentication guards have a user provider, which defines how the
+    | users are actually retrieved out of your database or other storage
+    | system used by the application. Typically, Eloquent is utilized.
+    |
+    | If you have multiple user tables or models you may configure multiple
+    | providers to represent the model / table. These providers may then
+    | be assigned to any extra authentication guards you have defined.
+    |
+    | Supported: "database", "eloquent"
+    |
+    */
+
+    'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model' => env('AUTH_MODEL', App\Models\User::class),
+        ],
+
+        // 'users' => [
+        //     'driver' => 'database',
+        //     'table' => 'users',
+        // ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resetting Passwords
+    |--------------------------------------------------------------------------
+    |
+    | These configuration options specify the behavior of Laravel's password
+    | reset functionality, including the table utilized for token storage
+    | and the user provider that is invoked to actually retrieve users.
+    |
+    | The expiry time is the number of minutes that each reset token will be
+    | considered valid. This security feature keeps tokens short-lived so
+    | they have less time to be guessed. You may change this as needed.
+    |
+    | The throttle setting is the number of seconds a user must wait before
+    | generating more password reset tokens. This prevents the user from
+    | quickly generating a very large amount of password reset tokens.
+    |
+    */
+
+    'passwords' => [
+        'users' => [
+            'provider' => 'users',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Password Confirmation Timeout
+    |--------------------------------------------------------------------------
+    |
+    | Here you may define the number of seconds before a password confirmation
+    | window expires and users are asked to re-enter their password via the
+    | confirmation screen. By default, the timeout lasts for three hours.
+    |
+    */
+
+    'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
+
+];
+</file>
+
+<file path="config/cache.php">
+<?php
+
+use Illuminate\Support\Str;
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Cache Store
+    |--------------------------------------------------------------------------
+    |
+    | This option controls the default cache store that will be used by the
+    | framework. This connection is utilized if another isn't explicitly
+    | specified when running a cache operation inside the application.
+    |
+    */
+
+    'default' => env('CACHE_STORE', 'database'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Stores
+    |--------------------------------------------------------------------------
+    |
+    | Here you may define all of the cache "stores" for your application as
+    | well as their drivers. You may even define multiple stores for the
+    | same cache driver to group types of items stored in your caches.
+    |
+    | Supported drivers: "array", "database", "file", "memcached",
+    |                    "redis", "dynamodb", "octane",
+    |                    "failover", "null"
+    |
+    */
+
+    'stores' => [
+
+        'array' => [
+            'driver' => 'array',
+            'serialize' => false,
+        ],
+
+        'database' => [
+            'driver' => 'database',
+            'connection' => env('DB_CACHE_CONNECTION'),
+            'table' => env('DB_CACHE_TABLE', 'cache'),
+            'lock_connection' => env('DB_CACHE_LOCK_CONNECTION'),
+            'lock_table' => env('DB_CACHE_LOCK_TABLE'),
+        ],
+
+        'file' => [
+            'driver' => 'file',
+            'path' => storage_path('framework/cache/data'),
+            'lock_path' => storage_path('framework/cache/data'),
+        ],
+
+        'memcached' => [
+            'driver' => 'memcached',
+            'persistent_id' => env('MEMCACHED_PERSISTENT_ID'),
+            'sasl' => [
+                env('MEMCACHED_USERNAME'),
+                env('MEMCACHED_PASSWORD'),
+            ],
+            'options' => [
+                // Memcached::OPT_CONNECT_TIMEOUT => 2000,
+            ],
+            'servers' => [
+                [
+                    'host' => env('MEMCACHED_HOST', '127.0.0.1'),
+                    'port' => env('MEMCACHED_PORT', 11211),
+                    'weight' => 100,
+                ],
+            ],
+        ],
+
+        'redis' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_CACHE_CONNECTION', 'cache'),
+            'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'default'),
+        ],
+
+        'dynamodb' => [
+            'driver' => 'dynamodb',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'table' => env('DYNAMODB_CACHE_TABLE', 'cache'),
+            'endpoint' => env('DYNAMODB_ENDPOINT'),
+        ],
+
+        'octane' => [
+            'driver' => 'octane',
+        ],
+
+        'failover' => [
+            'driver' => 'failover',
+            'stores' => [
+                'database',
+                'array',
+            ],
+        ],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache Key Prefix
+    |--------------------------------------------------------------------------
+    |
+    | When utilizing the APC, database, memcached, Redis, and DynamoDB cache
+    | stores, there might be other applications using the same cache. For
+    | that reason, you may prefix every cache key to avoid collisions.
+    |
+    */
+
+    'prefix' => env('CACHE_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-cache-'),
+
+];
+</file>
+
+<file path="config/database.php">
+<?php
+
+use Illuminate\Support\Str;
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Database Connection Name
+    |--------------------------------------------------------------------------
+    |
+    | Here you may specify which of the database connections below you wish
+    | to use as your default connection for database operations. This is
+    | the connection which will be utilized unless another connection
+    | is explicitly specified when you execute a query / statement.
+    |
+    */
+
+    'default' => env('DB_CONNECTION', 'sqlite'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Database Connections
+    |--------------------------------------------------------------------------
+    |
+    | Below are all of the database connections defined for your application.
+    | An example configuration is provided for each database system which
+    | is supported by Laravel. You're free to add / remove connections.
+    |
+    */
+
+    'connections' => [
+
+        'sqlite' => [
+            'driver' => 'sqlite',
+            'url' => env('DB_URL'),
+            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+            'busy_timeout' => null,
+            'journal_mode' => null,
+            'synchronous' => null,
+            'transaction_mode' => 'DEFERRED',
+        ],
+
+        'mysql' => [
+            'driver' => 'mysql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                (PHP_VERSION_ID >= 80500 ? \Pdo\Mysql::ATTR_SSL_CA : \PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
+        'mariadb' => [
+            'driver' => 'mariadb',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                (PHP_VERSION_ID >= 80500 ? \Pdo\Mysql::ATTR_SSL_CA : \PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
+        'pgsql' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
+
+        'sqlsrv' => [
+            'driver' => 'sqlsrv',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', 'localhost'),
+            'port' => env('DB_PORT', '1433'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            // 'encrypt' => env('DB_ENCRYPT', 'yes'),
+            // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
+        ],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Migration Repository Table
+    |--------------------------------------------------------------------------
+    |
+    | This table keeps track of all the migrations that have already run for
+    | your application. Using this information, we can determine which of
+    | the migrations on disk haven't actually been run on the database.
+    |
+    */
+
+    'migrations' => [
+        'table' => 'migrations',
+        'update_date_on_publish' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Redis Databases
+    |--------------------------------------------------------------------------
+    |
+    | Redis is an open source, fast, and advanced key-value store that also
+    | provides a richer body of commands than a typical key-value system
+    | such as Memcached. You may define your connection settings here.
+    |
+    */
+
+    'redis' => [
+
+        'client' => env('REDIS_CLIENT', 'phpredis'),
+
+        'options' => [
+            'cluster' => env('REDIS_CLUSTER', 'redis'),
+            'prefix' => env('REDIS_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-database-'),
+            'persistent' => env('REDIS_PERSISTENT', false),
+        ],
+
+        'default' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_DB', '0'),
+            'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+        ],
+
+        'cache' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_CACHE_DB', '1'),
+            'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+        ],
+
+    ],
+
+];
+</file>
+
+<file path="config/filesystems.php">
+<?php
+// FILE: config/filesystems.php
+
+return [
+
+    'default' => env('FILESYSTEM_DISK', 'local'),
+
+    'disks' => [
+
+        'local' => [
+            'driver' => 'local',
+            'root' => storage_path('app'),
+            'throw' => false,
+        ],
+
+        'public' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public'),
+            'url' => env('APP_URL').'/storage',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
+        's3' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_BUCKET'),
+            'url' => env('AWS_URL'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+        ],
+
+        // --- ИСПРАВЛЕННЫЙ ДРАЙВЕР ---
+        'tenant' => [
+            'driver' => 'local',
+            'root' => storage_path('tenants'), 
+            // Теперь URL короче и чище:
+            'url' => env('APP_URL').'/tenants', 
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+        // ----------------------------
+
+    ],
+
+    'links' => [
+        public_path('storage') => storage_path('app/public'),
+    ],
+
+];
+</file>
+
+<file path="config/logging.php">
+<?php
+
+use Monolog\Handler\NullHandler;
+use Monolog\Handler\StreamHandler;
+use Monolog\Handler\SyslogUdpHandler;
+use Monolog\Processor\PsrLogMessageProcessor;
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Log Channel
+    |--------------------------------------------------------------------------
+    |
+    | This option defines the default log channel that is utilized to write
+    | messages to your logs. The value provided here should match one of
+    | the channels present in the list of "channels" configured below.
+    |
+    */
+
+    'default' => env('LOG_CHANNEL', 'stack'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Deprecations Log Channel
+    |--------------------------------------------------------------------------
+    |
+    | This option controls the log channel that should be used to log warnings
+    | regarding deprecated PHP and library features. This allows you to get
+    | your application ready for upcoming major versions of dependencies.
+    |
+    */
+
+    'deprecations' => [
+        'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
+        'trace' => env('LOG_DEPRECATIONS_TRACE', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Log Channels
+    |--------------------------------------------------------------------------
+    |
+    | Here you may configure the log channels for your application. Laravel
+    | utilizes the Monolog PHP logging library, which includes a variety
+    | of powerful log handlers and formatters that you're free to use.
+    |
+    | Available drivers: "single", "daily", "slack", "syslog",
+    |                    "errorlog", "monolog", "custom", "stack"
+    |
+    */
+
+    'channels' => [
+
+        'stack' => [
+            'driver' => 'stack',
+            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            'ignore_exceptions' => false,
+        ],
+
+        'single' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'daily' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
+        'slack' => [
+            'driver' => 'slack',
+            'url' => env('LOG_SLACK_WEBHOOK_URL'),
+            'username' => env('LOG_SLACK_USERNAME', 'Laravel Log'),
+            'emoji' => env('LOG_SLACK_EMOJI', ':boom:'),
+            'level' => env('LOG_LEVEL', 'critical'),
+            'replace_placeholders' => true,
+        ],
+
+        'papertrail' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => env('LOG_PAPERTRAIL_HANDLER', SyslogUdpHandler::class),
+            'handler_with' => [
+                'host' => env('PAPERTRAIL_URL'),
+                'port' => env('PAPERTRAIL_PORT'),
+                'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
+
+        'stderr' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'handler_with' => [
+                'stream' => 'php://stderr',
+            ],
+            'formatter' => env('LOG_STDERR_FORMATTER'),
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
+
+        'syslog' => [
+            'driver' => 'syslog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'facility' => env('LOG_SYSLOG_FACILITY', LOG_USER),
+            'replace_placeholders' => true,
+        ],
+
+        'errorlog' => [
+            'driver' => 'errorlog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'null' => [
+            'driver' => 'monolog',
+            'handler' => NullHandler::class,
+        ],
+
+        'emergency' => [
+            'path' => storage_path('logs/laravel.log'),
+        ],
+
+    ],
+
+];
+</file>
+
+<file path="config/mail.php">
+<?php
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Mailer
+    |--------------------------------------------------------------------------
+    |
+    | This option controls the default mailer that is used to send all email
+    | messages unless another mailer is explicitly specified when sending
+    | the message. All additional mailers can be configured within the
+    | "mailers" array. Examples of each type of mailer are provided.
+    |
+    */
+
+    'default' => env('MAIL_MAILER', 'log'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mailer Configurations
+    |--------------------------------------------------------------------------
+    |
+    | Here you may configure all of the mailers used by your application plus
+    | their respective settings. Several examples have been configured for
+    | you and you are free to add your own as your application requires.
+    |
+    | Laravel supports a variety of mail "transport" drivers that can be used
+    | when delivering an email. You may specify which one you're using for
+    | your mailers below. You may also add additional mailers if needed.
+    |
+    | Supported: "smtp", "sendmail", "mailgun", "ses", "ses-v2",
+    |            "postmark", "resend", "log", "array",
+    |            "failover", "roundrobin"
+    |
+    */
+
+    'mailers' => [
+
+        'smtp' => [
+            'transport' => 'smtp',
+            'scheme' => env('MAIL_SCHEME'),
+            'url' => env('MAIL_URL'),
+            'host' => env('MAIL_HOST', '127.0.0.1'),
+            'port' => env('MAIL_PORT', 2525),
+            'username' => env('MAIL_USERNAME'),
+            'password' => env('MAIL_PASSWORD'),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        'ses' => [
+            'transport' => 'ses',
+        ],
+
+        'postmark' => [
+            'transport' => 'postmark',
+            // 'message_stream_id' => env('POSTMARK_MESSAGE_STREAM_ID'),
+            // 'client' => [
+            //     'timeout' => 5,
+            // ],
+        ],
+
+        'resend' => [
+            'transport' => 'resend',
+        ],
+
+        'sendmail' => [
+            'transport' => 'sendmail',
+            'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -bs -i'),
+        ],
+
+        'log' => [
+            'transport' => 'log',
+            'channel' => env('MAIL_LOG_CHANNEL'),
+        ],
+
+        'array' => [
+            'transport' => 'array',
+        ],
+
+        'failover' => [
+            'transport' => 'failover',
+            'mailers' => [
+                'smtp',
+                'log',
+            ],
+            'retry_after' => 60,
+        ],
+
+        'roundrobin' => [
+            'transport' => 'roundrobin',
+            'mailers' => [
+                'ses',
+                'postmark',
+            ],
+            'retry_after' => 60,
+        ],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Global "From" Address
+    |--------------------------------------------------------------------------
+    |
+    | You may wish for all emails sent by your application to be sent from
+    | the same address. Here you may specify a name and address that is
+    | used globally for all emails that are sent by your application.
+    |
+    */
+
+    'from' => [
+        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
+        'name' => env('MAIL_FROM_NAME', 'Example'),
+    ],
+
+];
+</file>
+
+<file path="config/queue.php">
+<?php
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Queue Connection Name
+    |--------------------------------------------------------------------------
+    |
+    | Laravel's queue supports a variety of backends via a single, unified
+    | API, giving you convenient access to each backend using identical
+    | syntax for each. The default queue connection is defined below.
+    |
+    */
+
+    'default' => env('QUEUE_CONNECTION', 'database'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue Connections
+    |--------------------------------------------------------------------------
+    |
+    | Here you may configure the connection options for every queue backend
+    | used by your application. An example configuration is provided for
+    | each backend supported by Laravel. You're also free to add more.
+    |
+    | Drivers: "sync", "database", "beanstalkd", "sqs", "redis",
+    |          "deferred", "background", "failover", "null"
+    |
+    */
+
+    'connections' => [
+
+        'sync' => [
+            'driver' => 'sync',
+        ],
+
+        'database' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => env('DB_QUEUE', 'default'),
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            'after_commit' => false,
+        ],
+
+        'beanstalkd' => [
+            'driver' => 'beanstalkd',
+            'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),
+            'queue' => env('BEANSTALKD_QUEUE', 'default'),
+            'retry_after' => (int) env('BEANSTALKD_QUEUE_RETRY_AFTER', 90),
+            'block_for' => 0,
+            'after_commit' => false,
+        ],
+
+        'sqs' => [
+            'driver' => 'sqs',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'prefix' => env('SQS_PREFIX', 'https://sqs.us-east-1.amazonaws.com/your-account-id'),
+            'queue' => env('SQS_QUEUE', 'default'),
+            'suffix' => env('SQS_SUFFIX'),
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'after_commit' => false,
+        ],
+
+        'redis' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => env('REDIS_QUEUE', 'default'),
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
+        'deferred' => [
+            'driver' => 'deferred',
+        ],
+
+        'background' => [
+            'driver' => 'background',
+        ],
+
+        'failover' => [
+            'driver' => 'failover',
+            'connections' => [
+                'database',
+                'deferred',
+            ],
+        ],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Job Batching
+    |--------------------------------------------------------------------------
+    |
+    | The following options configure the database and table that store job
+    | batching information. These options can be updated to any database
+    | connection and table which has been defined by your application.
+    |
+    */
+
+    'batching' => [
+        'database' => env('DB_CONNECTION', 'sqlite'),
+        'table' => 'job_batches',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Failed Queue Jobs
+    |--------------------------------------------------------------------------
+    |
+    | These options configure the behavior of failed queue job logging so you
+    | can control how and where failed jobs are stored. Laravel ships with
+    | support for storing failed jobs in a simple file or in a database.
+    |
+    | Supported drivers: "database-uuids", "dynamodb", "file", "null"
+    |
+    */
+
+    'failed' => [
+        'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
+        'database' => env('DB_CONNECTION', 'sqlite'),
+        'table' => 'failed_jobs',
+    ],
+
+];
+</file>
+
+<file path="config/services.php">
+<?php
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Third Party Services
+    |--------------------------------------------------------------------------
+    |
+    | This file is for storing the credentials for third party services such
+    | as Mailgun, Postmark, AWS and more. This file provides the de facto
+    | location for this type of information, allowing packages to have
+    | a conventional file to locate the various service credentials.
+    |
+    */
+
+    'postmark' => [
+        'key' => env('POSTMARK_API_KEY'),
+    ],
+
+    'resend' => [
+        'key' => env('RESEND_API_KEY'),
+    ],
+
+    'ses' => [
+        'key' => env('AWS_ACCESS_KEY_ID'),
+        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    ],
+
+    'slack' => [
+        'notifications' => [
+            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
+            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
+        ],
+    ],
+
+];
+</file>
+
+<file path="config/session.php">
+<?php
+
+use Illuminate\Support\Str;
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Session Driver
+    |--------------------------------------------------------------------------
+    |
+    | This option determines the default session driver that is utilized for
+    | incoming requests. Laravel supports a variety of storage options to
+    | persist session data. Database storage is a great default choice.
+    |
+    | Supported: "file", "cookie", "database", "memcached",
+    |            "redis", "dynamodb", "array"
+    |
+    */
+
+    'driver' => env('SESSION_DRIVER', 'database'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Lifetime
+    |--------------------------------------------------------------------------
+    |
+    | Here you may specify the number of minutes that you wish the session
+    | to be allowed to remain idle before it expires. If you want them
+    | to expire immediately when the browser is closed then you may
+    | indicate that via the expire_on_close configuration option.
+    |
+    */
+
+    'lifetime' => (int) env('SESSION_LIFETIME', 120),
+
+    'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Encryption
+    |--------------------------------------------------------------------------
+    |
+    | This option allows you to easily specify that all of your session data
+    | should be encrypted before it's stored. All encryption is performed
+    | automatically by Laravel and you may use the session like normal.
+    |
+    */
+
+    'encrypt' => env('SESSION_ENCRYPT', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session File Location
+    |--------------------------------------------------------------------------
+    |
+    | When utilizing the "file" session driver, the session files are placed
+    | on disk. The default storage location is defined here; however, you
+    | are free to provide another location where they should be stored.
+    |
+    */
+
+    'files' => storage_path('framework/sessions'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Database Connection
+    |--------------------------------------------------------------------------
+    |
+    | When using the "database" or "redis" session drivers, you may specify a
+    | connection that should be used to manage these sessions. This should
+    | correspond to a connection in your database configuration options.
+    |
+    */
+
+    'connection' => env('SESSION_CONNECTION'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Database Table
+    |--------------------------------------------------------------------------
+    |
+    | When using the "database" session driver, you may specify the table to
+    | be used to store sessions. Of course, a sensible default is defined
+    | for you; however, you're welcome to change this to another table.
+    |
+    */
+
+    'table' => env('SESSION_TABLE', 'sessions'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Cache Store
+    |--------------------------------------------------------------------------
+    |
+    | When using one of the framework's cache driven session backends, you may
+    | define the cache store which should be used to store the session data
+    | between requests. This must match one of your defined cache stores.
+    |
+    | Affects: "dynamodb", "memcached", "redis"
+    |
+    */
+
+    'store' => env('SESSION_STORE'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Sweeping Lottery
+    |--------------------------------------------------------------------------
+    |
+    | Some session drivers must manually sweep their storage location to get
+    | rid of old sessions from storage. Here are the chances that it will
+    | happen on a given request. By default, the odds are 2 out of 100.
+    |
+    */
+
+    'lottery' => [2, 100],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Cookie Name
+    |--------------------------------------------------------------------------
+    |
+    | Here you may change the name of the session cookie that is created by
+    | the framework. Typically, you should not need to change this value
+    | since doing so does not grant a meaningful security improvement.
+    |
+    */
+
+    'cookie' => env(
+        'SESSION_COOKIE',
+        Str::slug((string) env('APP_NAME', 'laravel')).'-session'
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Cookie Path
+    |--------------------------------------------------------------------------
+    |
+    | The session cookie path determines the path for which the cookie will
+    | be regarded as available. Typically, this will be the root path of
+    | your application, but you're free to change this when necessary.
+    |
+    */
+
+    'path' => env('SESSION_PATH', '/'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Cookie Domain
+    |--------------------------------------------------------------------------
+    |
+    | This value determines the domain and subdomains the session cookie is
+    | available to. By default, the cookie will be available to the root
+    | domain without subdomains. Typically, this shouldn't be changed.
+    |
+    */
+
+    'domain' => env('SESSION_DOMAIN'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTPS Only Cookies
+    |--------------------------------------------------------------------------
+    |
+    | By setting this option to true, session cookies will only be sent back
+    | to the server if the browser has a HTTPS connection. This will keep
+    | the cookie from being sent to you when it can't be done securely.
+    |
+    */
+
+    'secure' => env('SESSION_SECURE_COOKIE'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP Access Only
+    |--------------------------------------------------------------------------
+    |
+    | Setting this value to true will prevent JavaScript from accessing the
+    | value of the cookie and the cookie will only be accessible through
+    | the HTTP protocol. It's unlikely you should disable this option.
+    |
+    */
+
+    'http_only' => env('SESSION_HTTP_ONLY', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Same-Site Cookies
+    |--------------------------------------------------------------------------
+    |
+    | This option determines how your cookies behave when cross-site requests
+    | take place, and can be used to mitigate CSRF attacks. By default, we
+    | will set this value to "lax" to permit secure cross-site requests.
+    |
+    | See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#samesitesamesite-value
+    |
+    | Supported: "lax", "strict", "none", null
+    |
+    */
+
+    'same_site' => env('SESSION_SAME_SITE', 'lax'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Partitioned Cookies
+    |--------------------------------------------------------------------------
+    |
+    | Setting this value to true will tie the cookie to the top-level site for
+    | a cross-site context. Partitioned cookies are accepted by the browser
+    | when flagged "secure" and the Same-Site attribute is set to "none".
+    |
+    */
+
+    'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
+
+];
+</file>
+
+<file path="config/tenants.php">
+<?php
+// FILE: config/tenants.php
+
+return [
+    // Добавляем эту строку
+    'admin_domain' => env('ADMIN_DOMAIN', 'admin.trishop.local'),
+
+    'tenants' => [
+        'street_style' => [
+            'id' => 'street_style',
+            'domain' => env('DOMAIN_STREET', 'street.trishop.local'),
+            'name' => 'Street Style',
+        ],
+        'designer_hub' => [
+            'id' => 'designer_hub',
+            'domain' => env('DOMAIN_DESIGNER', 'designer.trishop.local'),
+            'name' => 'Designer Hub',
+        ],
+        'military_gear' => [
+            'id' => 'military_gear',
+            'domain' => env('DOMAIN_MILITARY', 'military.trishop.local'),
+            'name' => 'Military Gear',
+        ],
+    ],
+];
+</file>
+
+<file path="database/factories/UserFactory.php">
+<?php
+
+namespace Database\Factories;
+
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+/**
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ */
+class UserFactory extends Factory
+{
+    /**
+     * The current password being used by the factory.
+     */
+    protected static ?string $password;
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'name' => fake()->name(),
+            'email' => fake()->unique()->safeEmail(),
+            'email_verified_at' => now(),
+            'password' => static::$password ??= Hash::make('password'),
+            'remember_token' => Str::random(10),
+        ];
+    }
+
+    /**
+     * Indicate that the model's email address should be unverified.
+     */
+    public function unverified(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'email_verified_at' => null,
+        ]);
+    }
+}
+</file>
+
+<file path="database/migrations/0001_01_01_000000_create_users_table.php">
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->string('password');
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        Schema::create('password_reset_tokens', function (Blueprint $table) {
+            $table->string('email')->primary();
+            $table->string('token');
+            $table->timestamp('created_at')->nullable();
+        });
+
+        Schema::create('sessions', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->foreignId('user_id')->nullable()->index();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->longText('payload');
+            $table->integer('last_activity')->index();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('sessions');
+    }
+};
+</file>
+
+<file path="database/migrations/0001_01_01_000001_create_cache_table.php">
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('cache', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->mediumText('value');
+            $table->integer('expiration');
+        });
+
+        Schema::create('cache_locks', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->string('owner');
+            $table->integer('expiration');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('cache');
+        Schema::dropIfExists('cache_locks');
+    }
+};
+</file>
+
+<file path="database/migrations/0001_01_01_000002_create_jobs_table.php">
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('queue')->index();
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts');
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at');
+            $table->unsignedInteger('created_at');
+        });
+
+        Schema::create('job_batches', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->string('name');
+            $table->integer('total_jobs');
+            $table->integer('pending_jobs');
+            $table->integer('failed_jobs');
+            $table->longText('failed_job_ids');
+            $table->mediumText('options')->nullable();
+            $table->integer('cancelled_at')->nullable();
+            $table->integer('created_at');
+            $table->integer('finished_at')->nullable();
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uuid')->unique();
+            $table->text('connection');
+            $table->text('queue');
+            $table->longText('payload');
+            $table->longText('exception');
+            $table->timestamp('failed_at')->useCurrent();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('jobs');
+        Schema::dropIfExists('job_batches');
+        Schema::dropIfExists('failed_jobs');
+    }
+};
+</file>
+
+<file path="database/migrations/2024_01_01_000001_create_products_table.php">
+<?php
+// FILE: database/migrations/2024_01_01_000001_create_products_table.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('products', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('slug')->unique(); // Уникален в рамках одной схемы
+            $table->text('description')->nullable();
+            $table->decimal('price', 10, 2);
+            $table->string('category'); // Например: 'shoes', 'jackets'
+            $table->string('sku')->nullable(); // Артикул
+            $table->integer('stock_quantity')->default(0);
+            $table->json('attributes')->nullable(); // Размер, цвет и т.д.
+            $table->timestamps();
+            $table->softDeletes();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('products');
+    }
+};
+</file>
+
+<file path="database/migrations/2024_01_01_000002_create_orders_table.php">
+<?php
+// FILE: database/migrations/2024_01_01_000002_create_orders_table.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('orders', function (Blueprint $table) {
+            $table->id();
+            $table->string('order_number')->unique(); // ST-12345, DH-99999
+            $table->decimal('total_amount', 10, 2);
+            $table->string('status')->default('new'); // new, paid, shipped
+            $table->string('customer_email');
+            $table->string('customer_name')->nullable();
+            $table->json('items'); // Snapshot товаров на момент покупки
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('orders');
+    }
+};
+</file>
+
+<file path="database/migrations/2024_01_01_000003_create_tenant_settings_table.php">
+<?php
+// FILE: database/migrations/2024_01_01_000003_create_tenant_settings_table.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('tenant_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('key')->unique(); // 'telegram_chat_id', 'novaposhta_api_key'
+            $table->text('value')->nullable();
+            $table->string('group')->default('general'); // 'notifications', 'delivery'
+            $table->timestamps();
+        });
+        
+        // Добавим роль пользователям, если еще нет
+        if (!Schema::hasColumn('users', 'role')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('role')->default('manager'); // 'super_admin', 'manager'
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('tenant_settings');
+        if (Schema::hasColumn('users', 'role')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropColumn('role');
+            });
+        }
+    }
+};
+</file>
+
+<file path="database/migrations/2024_01_01_000004_add_tenant_id_to_users_table.php">
+<?php
+// FILE: database/migrations/2024_01_01_000004_add_tenant_id_to_users_table.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Добавляем поле и в public схему (для персонала), и в схемы тенантов (для клиентов)
+        Schema::table('users', function (Blueprint $table) {
+            // Если tenant_id NULL — это глобальный пользователь (Супер-админ)
+            // Если заполнено (например 'military_gear') — доступ только к этому магазину
+            $table->string('tenant_id')->nullable()->after('email');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn('tenant_id');
+        });
+    }
+};
+</file>
+
+<file path="database/migrations/2024_01_01_000005_add_image_to_products_table.php">
+<?php
+// FILE: database/migrations/2024_01_01_000005_add_image_to_products_table.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Эта миграция должна накатиться на ВСЕ схемы тенантов
+        Schema::table('products', function (Blueprint $table) {
+            $table->string('image_path')->nullable()->after('description');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropColumn('image_path');
+        });
+    }
+};
+</file>
+
+<file path="database/migrations/2024_01_01_000006_create_categories_table.php">
+<?php
+// FILE: database/migrations/2024_01_01_000006_create_categories_table.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // 1. Создаем таблицу категорий
+        Schema::create('categories', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('slug')->unique();
+            $table->timestamps();
+        });
+
+        // 2. Обновляем товары: category (string) -> category_id (int)
+        // Сначала добавляем колонку, старую пока не удаляем (чтобы не потерять данные, если нужно мигрировать)
+        Schema::table('products', function (Blueprint $table) {
+            $table->foreignId('category_id')->nullable()->constrained()->nullOnDelete();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropForeign(['category_id']);
+            $table->dropColumn('category_id');
+        });
+        Schema::dropIfExists('categories');
+    }
+};
+</file>
+
+<file path="database/migrations/2024_01_01_000007_refactor_categories_and_attributes.php">
+<?php
+// FILE: database/migrations/2024_01_01_000007_refactor_categories_and_attributes.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // 1. Таблица связей Товары <-> Категории
+        Schema::create('category_product', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('category_id')->constrained()->cascadeOnDelete();
+        });
+
+        // 2. Справочник атрибутов (Размеры, Типы, Материалы)
+        // Здесь будут храниться уникальные значения: "Hoodie", "XL", "Cotton"
+        Schema::create('attribute_options', function (Blueprint $table) {
+            $table->id();
+            $table->string('type'); // 'size', 'product_type', 'material'
+            $table->string('value'); // 'XL', 'Hoodie'
+            $table->string('slug')->nullable();
+            $table->timestamps();
+            
+            // Уникальность значения в рамках типа (не может быть два размера XL)
+            $table->unique(['type', 'value']);
+        });
+
+        // 3. Миграция данных (если были) и удаление старой колонки
+        // (Упрощено: просто удаляем колонку, так как данные тестовые)
+        if (Schema::hasColumn('products', 'category_id')) {
+            Schema::table('products', function (Blueprint $table) {
+                $table->dropForeign(['category_id']);
+                $table->dropColumn('category_id');
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('category_product');
+        Schema::dropIfExists('attribute_options');
+        Schema::table('products', function (Blueprint $table) {
+            $table->foreignId('category_id')->nullable()->constrained()->nullOnDelete();
+        });
+    }
+};
+</file>
+
+<file path="database/seeders/DatabaseSeeder.php">
+<?php
+// FILE: database/seeders/DatabaseSeeder.php
+
+namespace Database\Seeders;
+
+use App\Models\User;
+use App\Models\Product;
+use App\Services\TenantService;
+use App\Services\SearchService;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+
+class DatabaseSeeder extends Seeder
+{
+    public function run(TenantService $tenantService, SearchService $searchService): void
+    {
+        $currentTenant = $tenantService->getCurrentTenantId();
+        $password = Hash::make('password');
+
+        // 1. PUBLIC СХЕМА: Создаем Персонал
+        if (!$currentTenant) {
+            $this->command->info('Seeding PUBLIC schema (Staff)...');
+            
+            // Супер Админ (доступ ко всему)
+            User::updateOrCreate(
+                ['email' => 'admin@trishop.com'],
+                [
+                    'name' => 'Super Admin',
+                    'password' => $password,
+                    'role' => 'super_admin',
+                    'tenant_id' => null, // NULL = Глобальный доступ
+                ]
+            );
+
+            // Менеджеры (привязаны к магазинам)
+            $managers = [
+                'street_style' => 'manager@street.com',
+                'designer_hub' => 'manager@designer.com',
+                'military_gear' => 'manager@military.com',
+            ];
+
+            foreach ($managers as $tenant => $email) {
+                User::updateOrCreate(
+                    ['email' => $email],
+                    [
+                        'name' => ucfirst(str_replace('_', ' ', $tenant)) . ' Manager',
+                        'password' => $password,
+                        'role' => 'manager',
+                        'tenant_id' => $tenant, // ЖЕСТКАЯ ПРИВЯЗКА
+                    ]
+                );
+            }
+            return;
+        }
+
+        // 2. СХЕМЫ МАГАЗИНОВ: Только товары и данные клиентов
+        // Персонал здесь НЕ создаем, он живет в Public
+        $this->command->info("Seeding TENANT Data: {$currentTenant}");
+
+        // Очистка Elastic
+        try {
+            $searchService->deleteIndex();
+            $searchService->createIndexIfNotExists();
+        } catch (\Exception $e) {}
+
+        // Товары
+        $products = $this->getProductsForTenant($currentTenant);
+        foreach ($products as $data) {
+            $product = Product::firstOrCreate(['sku' => $data['sku']], $data);
+            try {
+                $searchService->indexProduct($product);
+            } catch (\Exception $e) {}
+        }
+    }
+
+    private function getProductsForTenant(string $tenant): array
+    {
+        // ... (Используем тот же список товаров, что и раньше)
+        // Для краткости я его не дублирую здесь, код идентичен предыдущему этапу
+        return match ($tenant) {
+            'street_style' => [['name' => 'Graffiti Hoodie', 'price' => 89.99, 'sku' => 'ST-01', 'slug'=>'h1', 'category'=>'Hoodie']], 
+            'military_gear' => [['name' => 'Tactical Vest', 'price' => 150.00, 'sku' => 'MG-01', 'slug'=>'v1', 'category'=>'Vest']],
+            'designer_hub' => [['name' => 'Evening Gown', 'price' => 500.00, 'sku' => 'DH-01', 'slug'=>'d1', 'category'=>'Dress']],
+            default => [],
+        };
+    }
+}
+</file>
+
+<file path="database/.gitignore">
+*.sqlite*
+</file>
+
+<file path="docker/nginx/conf.d/app.conf">
+# FILE: docker/nginx/conf.d/app.conf
+server {
+    listen 80;
+    index index.php index.html;
+    error_log  /var/log/nginx/error.log;
+    access_log /var/log/nginx/access.log;
+    root /var/www/public;
+
+    # ДОБАВЛЕНО: admin.trishop.local
+    server_name localhost street.trishop.local designer.trishop.local military.trishop.local admin.trishop.local;
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass app:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+        gzip_static on;
+    }
+}
+</file>
+
+<file path="docker/php/Dockerfile">
+# FILE: docker/php/Dockerfile
+FROM php:8.2-fpm
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    libpq-dev \
+    libzip-dev
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+# pdo_pgsql - for PostgreSQL
+# bcmath - for financial calculations
+# redis - for Redis connection
+RUN docker-php-ext-install pdo_pgsql mbstring exif pcntl bcmath gd zip
+
+# Install Redis extension via PECL
+RUN pecl install redis && docker-php-ext-enable redis
+
+# Get latest Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www
+
+# Create system user to run Composer and Artisan Commands
+RUN groupadd -g 1000 www
+RUN useradd -u 1000 -ms /bin/bash -g www www
+
+# Change current user to www
+USER www
+
+# Expose port 9000 and start php-fpm server
+EXPOSE 9000
+CMD ["php-fpm"]
+</file>
+
+<file path="docker-compose.yml">
+# FILE: docker-compose.yml
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: trishop_app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    networks:
+      - trishop_network
+    depends_on:
+      - db
+      - redis
+      - elasticsearch
+
+  web:
+    image: nginx:alpine
+    container_name: trishop_web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - trishop_network
+    depends_on:
+      - app
+
+  db:
+    image: postgres:15
+    container_name: trishop_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    networks:
+      - trishop_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: trishop_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - trishop_network
+
+  elasticsearch:
+    image: elasticsearch:8.11.1
+    container_name: trishop_elastic
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "${ELASTIC_PORT}:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - trishop_network
+
+networks:
+  trishop_network:
+    driver: bridge
+
+volumes:
+  dbdata:
+  redisdata:
+  esdata:
+</file>
+
+<file path="full_reset.sh">
+#!/bin/bash
+# FILE: full_reset.sh
+
+echo "⚠️  WARNING: This will DESTROY all data in databases and storage!"
+echo "⚠️  Make sure you have configured /etc/hosts as per MANUAL.md"
+read -p "Press [Enter] to continue or Ctrl+C to abort..."
+
+# 1. Остановка и очистка
+echo "🛑 Stopping containers and removing volumes..."
+docker compose down -v
+# Удаляем файлы сессий и кэша, которые могли быть созданы с правами root
+sudo rm -rf storage/framework/sessions/*
+sudo rm -rf storage/framework/views/*
+sudo rm -rf storage/framework/cache/*
+sudo rm -rf storage/tenants
+sudo rm -rf public/tenants
+
+# 2. Пересборка и запуск
+echo "🏗  Building and starting containers..."
+# Проверка max_map_count для Elastic (частая ошибка)
+if [ "$(sysctl -n vm.max_map_count)" -lt 262144 ]; then
+    echo "❌ vm.max_map_count is too low for Elasticsearch."
+    echo "👉 Run: sudo sysctl -w vm.max_map_count=262144"
+    exit 1
+fi
+
+docker compose up -d --build
+
+echo "⏳ Waiting for Database to initialize (15 seconds)..."
+sleep 15
+
+# 3. Установка зависимостей
+echo "📦 Installing Composer dependencies..."
+docker compose exec app composer install
+
+# 4. Настройка приложения
+echo "🔑 Generating Application Key..."
+docker compose exec app php artisan key:generate
+
+echo "🔗 Linking Storage..."
+# Создаем стандартный линк public/storage
+docker compose exec app php artisan storage:link
+# Создаем линки тенантов public/tenants/{id}
+docker compose exec app php artisan tenants:link
+
+# 5. Очистка кэша (важно для конфигов доменов)
+echo "🧹 Clearing caches..."
+docker compose exec app php artisan optimize:clear
+
+# 6. Миграция и Посев (САМОЕ ВАЖНОЕ)
+echo "🌱 Migrating and Seeding (Public + Tenants)..."
+# Внимание: здесь используется наша исправленная команда, которая
+# сначала сеет Public (создает Админа), а потом магазины.
+docker compose exec app php artisan tenants:migrate --fresh --seed
+
+echo "✅ DONE! System is ready."
+echo "👉 Admin Panel: http://admin.trishop.local"
+</file>
+
+<file path="package.json">
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.0.0",
+        "axios": "^1.11.0",
+        "concurrently": "^9.0.1",
+        "laravel-vite-plugin": "^2.0.0",
+        "tailwindcss": "^4.0.0",
+        "vite": "^7.0.7"
+    }
+}
+</file>
+
+<file path="phpunit.xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_DATABASE" value="testing"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>
+</file>
+
+<file path="public/.htaccess">
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+</file>
+
+<file path="public/index.php">
+<?php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+
+// Determine if the application is in maintenance mode...
+if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+// Register the Composer autoloader...
+require __DIR__.'/../vendor/autoload.php';
+
+// Bootstrap Laravel and handle the request...
+/** @var Application $app */
+$app = require_once __DIR__.'/../bootstrap/app.php';
+
+$app->handleRequest(Request::capture());
+</file>
+
+<file path="public/robots.txt">
+User-agent: *
+Disallow:
+</file>
+
+<file path=".gitignore">
+# FILE: .gitignore
+
+# --- Laravel Framework & Composer ---
+/vendor
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+/.fleet
+/.idea
+/.vscode
+
+# --- Laravel Storage (Logs, Cache, Sessions) ---
+# Сохраняем структуру папок (через .gitignore внутри), но игнорируем содержимое
+/storage/app/public/*
+!/storage/app/public/.gitignore
+
+/storage/framework/cache/data/*
+!/storage/framework/cache/data/.gitignore
+
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+
+/storage/logs/*
+!/storage/logs/.gitignore
+
+# --- Vite / Frontend Build ---
+/public/build
+
+# --- Multi-Tenancy Specifics ---
+# Игнорируем симлинки, созданные командой tenants:link
+/public/tenants
+
+# Игнорируем загруженные медиафайлы тенантов, их логи и кэш,
+# но оставляем саму структуру папок (благодаря .gitignore внутри setup_structure.sh)
+/storage/tenants/*/media/*
+!/storage/tenants/*/media/.gitignore
+
+/storage/tenants/*/logs/*
+!/storage/tenants/*/logs/.gitignore
+
+/storage/tenants/*/cache/*
+!/storage/tenants/*/cache/.gitignore
+
+# --- Docker & System ---
+.DS_Store
+Thumbs.db
+docker-compose.override.yml
+
+# Если вы создавали локальные дампы БД
+*.sql
+*.sql.gz
+
+# --- Editor Specific ---
+.phpintel/
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+</file>
+
+<file path="app/Http/Controllers/Admin/UserController.php">
+<?php
+// FILE: app/Http/Controllers/Admin/UserController.php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+
+class UserController extends Controller
+{
+    public function __construct()
+    {
+        // 1. БЕЗОПАСНОСТЬ: Только Супер-Админ имеет доступ к этому контроллеру
+        // Если обычный менеджер попытается зайти -> 403 Forbidden
+        $this->middleware(function ($request, $next) {
+            if (auth()->user()->role !== 'super_admin') {
+                abort(403, 'Access denied. Only Super Admin can manage users.');
+            }
+            return $next($request);
+        });
+    }
+
+    public function index()
+    {
+        $users = User::orderBy('id')->get();
+        return view('admin.users.index', compact('users'));
+    }
+
+    public function create()
+    {
+        return view('admin.users.create');
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
+            'role' => 'required|in:manager,super_admin',
+            // Если роль менеджер - tenant_id обязателен, если админ - nullable
+            'tenant_id' => 'required_if:role,manager',
+        ]);
+
+        $validated['password'] = Hash::make($validated['password']);
+
+        User::create($validated);
+
+        return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
+    }
+
+    public function edit($id)
+    {
+        $user = User::findOrFail($id);
+        return view('admin.users.edit', compact('user'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
+            'role' => 'required|in:manager,super_admin',
+            'tenant_id' => 'required_if:role,manager',
+            'password' => 'nullable|string|min:6',
+        ]);
+
+        if (!empty($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
+
+        $user->update($validated);
+
+        return redirect()->route('admin.users.index')->with('success', 'User updated successfully.');
+    }
+
+    public function destroy($id)
+    {
+        if ($id == auth()->id()) {
+            return back()->with('error', 'You cannot delete yourself.');
+        }
+        User::destroy($id);
+        return back()->with('success', 'User deleted.');
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/ShopController.php">
+<?php
+// FILE: app/Http/Controllers/ShopController.php
+
+namespace App\Http\Controllers;
+
+use App\Models\Category;
+use App\Models\Product;
+use App\Services\CartService;
+use App\Services\TenantService;
+use Illuminate\Http\Request;
+
+class ShopController extends Controller
+{
+    protected TenantService $tenantService;
+    protected CartService $cartService;
+
+    public function __construct(TenantService $tenantService, CartService $cartService)
+    {
+        $this->tenantService = $tenantService;
+        $this->cartService = $cartService;
+    }
+
+    public function index(Request $request)
+    {
+        $tenantId = $this->tenantService->getCurrentTenantId();
+        
+        $query = Product::query()->with('categories');
+
+        // Фильтрация
+        if ($request->has('category')) {
+            $query->whereHas('categories', function ($q) use ($request) {
+                $q->where('slug', $request->category);
+            });
+        }
+        
+        $products = $query->latest()->paginate(12);
+        $categories = Category::has('products')->get(); // Показываем только категории с товарами
+
+        return view("tenants.{$tenantId}.home", compact('products', 'categories'));
+    }
+
+    public function show($slug)
+    {
+        $tenantId = $this->tenantService->getCurrentTenantId();
+        // Загружаем товар
+        $product = Product::where('slug', $slug)->firstOrFail();
+        
+        // Пытаемся загрузить уникальный шаблон товара для магазина, если нет - общий
+        $viewName = "tenants.{$tenantId}.product";
+        if (!view()->exists($viewName)) {
+            // Фолбэк, если вдруг не создали (но мы создадим)
+            abort(404, "View {$viewName} not found");
+        }
+
+        return view($viewName, compact('product'));
+    }
+
+    // Методы корзины без изменений...
+    public function cart() { 
+        return view('cart', [
+            'cart' => $this->cartService->get(), 
+            'total' => $this->cartService->total(), 
+            'tenantId' => $this->tenantService->getCurrentTenantId()
+        ]); 
+    }
+    public function addToCart(Request $request) { 
+        $this->cartService->add((int)$request->product_id); 
+        return back()->with('success', 'Added to cart!'); 
+    }
+    public function checkout(Request $request) { 
+        return redirect()->back()->with('error', 'Checkout logic is mocked.'); 
+    }
+}
+</file>
+
+<file path="app/Models/Product.php">
+<?php
+// FILE: app/Models/Product.php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
+
+class Product extends Model
+{
+    use HasFactory, SoftDeletes;
+
+    protected $fillable = [
+        'name', 
+        'slug', 
+        'description', 
+        'image_path',
+        'price', 
+        // 'category_id' удален
+        'sku', 
+        'stock_quantity', 
+        'attributes' // JSON оставим для быстрого чтения, но значения будем брать из справочников
+    ];
+
+    protected $casts = [
+        'attributes' => 'array',
+        'price' => 'decimal:2',
+    ];
+
+    public function categories()
+    {
+        return $this->belongsToMany(Category::class);
+    }
+
+    public function getImageUrlAttribute()
+    {
+        if (!$this->image_path) {
+            return 'https://via.placeholder.com/300x300?text=No+Image';
+        }
+        return Storage::disk('tenant')->url($this->image_path);
+    }
+}
+</file>
+
+<file path="README.md">
+<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+
+<p align="center">
+<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+</p>
+
+## About Laravel
+
+Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+
+- [Simple, fast routing engine](https://laravel.com/docs/routing).
+- [Powerful dependency injection container](https://laravel.com/docs/container).
+- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
+- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
+- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
+- [Robust background job processing](https://laravel.com/docs/queues).
+- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+
+Laravel is accessible, powerful, and provides tools required for large, robust applications.
+
+## Learning Laravel
+
+Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+
+If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+
+## Laravel Sponsors
+
+We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+
+### Premium Partners
+
+- **[Vehikl](https://vehikl.com)**
+- **[Tighten Co.](https://tighten.co)**
+- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
+- **[64 Robots](https://64robots.com)**
+- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
+- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
+- **[Redberry](https://redberry.international/laravel-development)**
+- **[Active Logic](https://activelogic.com)**
+
+## Contributing
+
+Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+
+## Code of Conduct
+
+In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+
+## Security Vulnerabilities
+
+If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+
+## License
+
+The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+</file>
+
+</files>

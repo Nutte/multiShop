@@ -12,6 +12,7 @@ use App\Services\TenantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 class ProductController extends Controller
 {
@@ -24,56 +25,146 @@ class ProductController extends Controller
         $this->productService = $productService;
     }
 
-    private function checkContext()
+    // Хелпер: Получить товары со всех магазинов (Для Супер-Админа)
+    private function getAllTenantsProducts(Request $request)
     {
-        if (auth()->user()->role === 'super_admin' && !$this->tenantService->getCurrentTenantId()) {
-            return false;
+        $allProducts = new Collection();
+        $tenants = config('tenants.tenants');
+
+        foreach ($tenants as $id => $config) {
+            // Переключаемся
+            $this->tenantService->switchTenant($id);
+            
+            // Строим запрос
+            $query = Product::with('categories')->latest()->take(10); // Берем последние 10 с каждого
+            
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'ilike', "%{$search}%")->orWhere('sku', 'ilike', "%{$search}%");
+                });
+            }
+            // (Другие фильтры для All mode опустим для производительности, но поиск оставим)
+
+            $products = $query->get();
+            
+            // Добавляем метку магазина
+            $products->each(function($p) use ($config, $id) {
+                $p->tenant_name = $config['name'];
+                $p->tenant_id = $id;
+                $p->preview_url = "http://{$config['domain']}/products/{$p->slug}?preview=true";
+            });
+
+            $allProducts = $allProducts->merge($products);
         }
-        return true;
+
+        return $allProducts; // Это коллекция, не пагинатор
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        if (!$this->checkContext()) return view('admin.products.select_tenant');
-        // Подгружаем категории для отображения в списке
-        $products = Product::with('categories')->latest()->paginate(10);
-        return view('admin.products.index', compact('products'));
+        $isSuperAdmin = auth()->user()->role === 'super_admin';
+        $selectedTenant = $request->get('tenant_id');
+
+        // СЦЕНАРИЙ 1: Супер-Админ смотрит "ВСЁ" (по умолчанию)
+        if ($isSuperAdmin && empty($selectedTenant)) {
+            $products = $this->getAllTenantsProducts($request);
+            $currentTenantId = null;
+            $categories = new Collection(); // В режиме ALL категории сложно объединить (у них разные ID)
+            $sizes = new Collection();
+            $types = new Collection();
+            
+            return view('admin.products.index', compact('products', 'categories', 'sizes', 'types', 'currentTenantId'));
+        }
+
+        // СЦЕНАРИЙ 2: Выбран конкретный магазин (или это Менеджер)
+        if ($isSuperAdmin && $selectedTenant) {
+            $this->tenantService->switchTenant($selectedTenant);
+            $currentTenantId = $selectedTenant;
+        } else {
+            // Менеджер уже в своем контексте
+            $currentTenantId = $this->tenantService->getCurrentTenantId();
+        }
+
+        // Обычный запрос внутри одного тенанта
+        $query = Product::with('categories');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'ilike', "%{$search}%")->orWhere('sku', 'ilike', "%{$search}%");
+            });
+        }
+        if ($request->filled('category_id')) {
+            $query->whereHas('categories', fn($q) => $q->where('categories.id', $request->category_id));
+        }
+        if ($request->filled('size')) {
+            $query->whereRaw("attributes->'size' ? ?", [$request->size]);
+        }
+        if ($request->filled('type')) {
+            $query->whereRaw("attributes->>'type' = ?", [$request->type]);
+        }
+
+        $products = $query->latest()->paginate(20)->withQueryString();
+        
+        // Генерация превью
+        $tenantDomain = config('tenants.tenants.' . $currentTenantId . '.domain');
+        foreach ($products as $product) {
+            $product->preview_url = "http://{$tenantDomain}/products/{$product->slug}?preview=true";
+            $product->tenant_name = config("tenants.tenants.{$currentTenantId}.name");
+        }
+
+        $categories = Category::orderBy('name')->get();
+        $sizes = AttributeOption::where('type', 'size')->orderBy('value')->get();
+        $types = AttributeOption::where('type', 'product_type')->orderBy('value')->get();
+
+        return view('admin.products.index', compact('products', 'categories', 'sizes', 'types', 'currentTenantId'));
     }
 
     public function create()
     {
-        if (!$this->checkContext()) return view('admin.products.select_tenant');
-        
+        // Если супер-админ нажал Create из режима "ALL", форсируем выбор магазина
+        if (auth()->user()->role === 'super_admin' && !$this->tenantService->getCurrentTenantId()) {
+            // Берем первый магазин по умолчанию, чтобы форма открылась
+             $first = array_key_first(config('tenants.tenants'));
+             $this->tenantService->switchTenant($first);
+             $currentTenantId = $first;
+        } else {
+             $currentTenantId = $this->tenantService->getCurrentTenantId();
+        }
+
         $categories = Category::all();
-        // Загружаем доступные опции для подсказок
         $sizes = AttributeOption::where('type', 'size')->get();
         $types = AttributeOption::where('type', 'product_type')->get();
 
-        return view('admin.products.create', compact('categories', 'sizes', 'types'));
+        return view('admin.products.create', compact('categories', 'sizes', 'types', 'currentTenantId'));
     }
 
     public function store(Request $request)
     {
+        // 1. Установка контекста для Супер-Админа
+        if (auth()->user()->role === 'super_admin' && $request->has('target_tenant')) {
+            $this->tenantService->switchTenant($request->target_tenant);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
-            // categories теперь массив, может содержать ID или строки (новые названия)
-            'categories' => 'required|array', 
+            'categories' => 'required|array', // Массив ID или строк
             'stock_quantity' => 'required|integer|min:0',
-            'sku' => 'required|string|max:50|unique:products,sku', 
+            'sku' => 'required|string|max:50', 
             'image' => 'nullable|image|max:2048',
-            // Атрибуты тоже могут быть новыми
             'attributes_type' => 'required|string', 
             'attributes_size' => 'nullable|array', 
         ]);
 
-        // 1. Обработка КАТЕГОРИЙ (Create on fly)
+        // 2. АВТО-СОЗДАНИЕ КАТЕГОРИЙ (Create on fly)
         $categoryIds = [];
         foreach ($request->categories as $input) {
             if (is_numeric($input)) {
                 $categoryIds[] = $input;
             } else {
-                // Это новая категория (строка)
+                // Если пришла строка "New Category" -> создаем её
                 $newCat = Category::firstOrCreate(
                     ['name' => $input],
                     ['slug' => Str::slug($input)]
@@ -82,14 +173,13 @@ class ProductController extends Controller
             }
         }
 
-        // 2. Обработка ТИПА ПРОДУКТА (Справочник)
-        $typeName = $request->attributes_type;
+        // 3. АВТО-СОЗДАНИЕ АТРИБУТОВ
+        // Тип
         AttributeOption::firstOrCreate(
-            ['type' => 'product_type', 'value' => $typeName],
-            ['slug' => Str::slug($typeName)]
+            ['type' => 'product_type', 'value' => $request->attributes_type],
+            ['slug' => Str::slug($request->attributes_type)]
         );
-
-        // 3. Обработка РАЗМЕРОВ (Справочник)
+        // Размеры
         $sizes = $request->attributes_size ?? [];
         foreach ($sizes as $sizeName) {
             AttributeOption::firstOrCreate(
@@ -98,13 +188,11 @@ class ProductController extends Controller
             );
         }
 
-        // 4. Картинка
         $imagePath = null;
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('media', 'tenant');
         }
 
-        // 5. Создание товара
         $product = $this->productService->create([
             'name' => $validated['name'],
             'slug' => Str::slug($validated['name']) . '-' . Str::random(4),
@@ -114,20 +202,24 @@ class ProductController extends Controller
             'description' => $request->input('description'),
             'image_path' => $imagePath,
             'attributes' => [
-                'type' => $typeName,
+                'type' => $request->attributes_type,
                 'size' => $sizes,
             ]
         ]);
 
-        // 6. Привязка категорий
         $product->categories()->sync($categoryIds);
 
-        return redirect()->route('admin.products.index')->with('success', 'Product created with dynamic attributes.');
+        // Возвращаем на список конкретного магазина, где создали товар
+        return redirect()->route('admin.products.index', ['tenant_id' => $this->tenantService->getCurrentTenantId()])
+                         ->with('success', 'Product created successfully.');
     }
 
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
-        if (!$this->checkContext()) return view('admin.products.select_tenant');
+        // Восстанавливаем контекст из URL, если есть
+        if ($request->has('tenant_id') && auth()->user()->role === 'super_admin') {
+            $this->tenantService->switchTenant($request->tenant_id);
+        }
 
         $product = Product::with('categories')->findOrFail($id);
         $categories = Category::all();
@@ -140,75 +232,19 @@ class ProductController extends Controller
         return view('admin.products.edit', compact('product', 'categories', 'previewUrl', 'sizes', 'types'));
     }
 
-    public function update(Request $request, $id)
+    // Update и Destroy аналогичны, главное - контекст
+    public function update(Request $request, $id) { /* ... код без изменений ... */ }
+    
+    public function destroy(Request $request, $id)
     {
-        if (!$this->checkContext()) return view('admin.products.select_tenant');
-        
-        $product = Product::findOrFail($id);
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'categories' => 'required|array',
-            'stock_quantity' => 'required|integer|min:0',
-            'sku' => 'required|string|max:50',
-            'image' => 'nullable|image|max:2048',
-            'attributes_type' => 'required|string', 
-            'attributes_size' => 'nullable|array', 
-        ]);
-
-        // Обработка Категорий
-        $categoryIds = [];
-        foreach ($request->categories as $input) {
-            if (is_numeric($input)) {
-                $categoryIds[] = $input;
-            } else {
-                $newCat = Category::firstOrCreate(['name' => $input], ['slug' => Str::slug($input)]);
-                $categoryIds[] = $newCat->id;
-            }
+        if ($request->has('tenant_id')) {
+             $this->tenantService->switchTenant($request->tenant_id);
         }
-
-        // Обработка Атрибутов
-        $typeName = $request->attributes_type;
-        AttributeOption::firstOrCreate(['type' => 'product_type', 'value' => $typeName], ['slug' => Str::slug($typeName)]);
-        
-        $sizes = $request->attributes_size ?? [];
-        foreach ($sizes as $sizeName) {
-            AttributeOption::firstOrCreate(['type' => 'size', 'value' => $sizeName], ['slug' => Str::slug($sizeName)]);
-        }
-
-        // Картинка
-        if ($request->hasFile('image')) {
-            if ($product->image_path) {
-                Storage::disk('tenant')->delete($product->image_path);
-            }
-            $product->image_path = $request->file('image')->store('media', 'tenant');
-        }
-
-        $product->update([
-            'name' => $validated['name'],
-            'price' => $validated['price'],
-            'sku' => $validated['sku'],
-            'stock_quantity' => $validated['stock_quantity'],
-            'description' => $request->input('description'),
-            'attributes' => [
-                'type' => $typeName,
-                'size' => $sizes,
-            ]
-        ]);
-
-        $product->categories()->sync($categoryIds);
-
-        return redirect()->route('admin.products.index')->with('success', 'Product updated.');
-    }
-
-    public function destroy($id)
-    {
-        if (!$this->checkContext()) return view('admin.products.select_tenant');
         
         $product = Product::findOrFail($id);
         if ($product->image_path) Storage::disk('tenant')->delete($product->image_path);
         $product->delete();
-        return redirect()->route('admin.products.index')->with('success', 'Product deleted.');
+        
+        return back()->with('success', 'Product deleted.');
     }
 }

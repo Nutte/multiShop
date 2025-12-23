@@ -18,38 +18,51 @@ class CategoryController extends Controller
         $this->tenantService = $tenantService;
     }
 
-    public function index()
+    private function resolveContext(Request $request)
     {
-        // Проверка контекста для супер-админа
-        if (auth()->user()->role === 'super_admin' && !$this->tenantService->getCurrentTenantId()) {
-            return view('admin.products.select_tenant'); // Используем тот же вью выбора
+        if (auth()->user()->role !== 'super_admin') {
+            return $this->tenantService->getCurrentTenantId();
         }
-
-        $categories = Category::withCount('products')->get();
-        return view('admin.categories.index', compact('categories'));
+        
+        $tenantId = $request->tenant_id ?? array_key_first(config('tenants.tenants'));
+        if ($tenantId) {
+            $this->tenantService->switchTenant($tenantId);
+        }
+        return $tenantId;
     }
 
-    public function create()
+    public function index(Request $request)
     {
-        return view('admin.categories.create');
+        $currentTenantId = $this->resolveContext($request);
+        
+        $query = Category::withCount('products');
+        
+        if ($request->filled('search')) {
+            $query->where('name', 'ilike', "%{$request->search}%");
+        }
+
+        $categories = $query->orderBy('name')->get();
+
+        return view('admin.categories.index', compact('categories', 'currentTenantId'));
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-        ]);
+        $this->resolveContext($request);
+        
+        $validated = $request->validate(['name' => 'required|string|max:255']);
 
         Category::create([
             'name' => $validated['name'],
             'slug' => Str::slug($validated['name']),
         ]);
 
-        return redirect()->route('admin.categories.index')->with('success', 'Category created.');
+        return back()->with('success', 'Category created.');
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
+        $this->resolveContext($request);
         Category::destroy($id);
         return back()->with('success', 'Category deleted.');
     }
