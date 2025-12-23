@@ -43,6 +43,10 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         
         Route::resource('products', ProductController::class);
         Route::resource('categories', CategoryController::class);
+
+        Route::resource('clothing-lines', \App\Http\Controllers\Admin\ClothingLineController::class);
+        
+        Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
         
         Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
         Route::post('/attributes', [AttributeController::class, 'store'])->name('attributes.store');

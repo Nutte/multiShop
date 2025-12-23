@@ -14,34 +14,16 @@
         @endif
     </div>
 
-    <!-- Инициализация данных Alpine.js прямо здесь, чтобы избежать ошибок загрузки -->
+    <!-- Инициализация данных Alpine.js -->
     <div class="max-w-6xl mx-auto bg-white rounded shadow p-6" 
          x-data="{
             variants: {{ json_encode($product->variants->map(fn($v) => ['size' => $v->size, 'stock' => $v->stock])->values()->all()) }},
             manualStock: {{ $product->stock_quantity ?? 0 }},
-            
-            // Геттер: Есть ли варианты?
-            get hasVariants() { 
-                return this.variants.length > 0; 
-            },
-            
-            // Геттер: Сумма стока вариантов
-            get calculatedStock() { 
-                return this.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0); 
-            },
-
-            // Геттер: Текущее значение для инпута (или сумма, или ручной ввод)
-            get currentStock() {
-                return this.hasVariants ? this.calculatedStock : this.manualStock;
-            },
-
-            addVariant() {
-                this.variants.push({size: '', stock: 0});
-            },
-
-            removeVariant(index) {
-                this.variants.splice(index, 1);
-            }
+            get hasVariants() { return this.variants.length > 0; },
+            get calculatedStock() { return this.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0); },
+            get currentStock() { return this.hasVariants ? this.calculatedStock : this.manualStock; },
+            addVariant() { this.variants.push({size: '', stock: 0}); },
+            removeVariant(index) { this.variants.splice(index, 1); }
          }">
         
         <form action="{{ $action }}" method="POST" enctype="multipart/form-data" id="productForm">
@@ -83,24 +65,12 @@
                         </div>
                         <div>
                             <label class="block text-sm font-bold mb-2">Total Stock</label>
-                            <!-- Умный инпут: 
-                                 - Если есть варианты: Readonly и показывает сумму.
-                                 - Если нет вариантов: Editable и пишет в manualStock.
-                                 - Отправляет значение в name="stock_quantity"
-                            -->
-                            <input type="number" 
-                                   name="stock_quantity" 
-                                   :value="currentStock"
-                                   @input="if(!hasVariants) manualStock = $event.target.value"
-                                   :readonly="hasVariants"
-                                   :class="hasVariants ? 'bg-gray-100 cursor-not-allowed text-gray-500' : 'bg-white'"
-                                   class="w-full border p-2 rounded transition" 
-                                   required>
+                            <input type="number" name="stock_quantity" :value="currentStock" @input="if(!hasVariants) manualStock = $event.target.value" :readonly="hasVariants" :class="hasVariants ? 'bg-gray-100 cursor-not-allowed text-gray-500' : 'bg-white'" class="w-full border p-2 rounded transition" required>
                             <p class="text-xs text-gray-400 mt-1" x-text="hasVariants ? 'Auto-calculated from variants sum.' : 'Enter stock manually.'"></p>
                         </div>
                     </div>
 
-                    <!-- Categories, Type & Variants -->
+                    <!-- CLASSIFICATION SECTION -->
                     <div class="space-y-4 bg-gray-50 p-4 rounded border">
                         <h3 class="font-bold text-gray-700 border-b pb-2 mb-2">Classification & Inventory</h3>
                         
@@ -124,6 +94,18 @@
                              </div>
                         </div>
 
+                        <!-- CLOTHING LINE (Safe Access Fix) -->
+                        <div x-data="{ options: {{ $lines->pluck('name') }} }">
+                            <label class="block text-sm font-bold mb-2">Clothing Line / Collection <span class="font-normal text-gray-400">(Optional)</span></label>
+                            <input type="text" name="clothing_line" value="{{ old('clothing_line', optional($product->clothingLine)->name) }}" list="lineList" class="w-full border p-2 rounded" placeholder="e.g. Summer 2025">
+                            <datalist id="lineList">
+                                <template x-for="opt in options">
+                                    <option :value="opt"></option>
+                                </template>
+                            </datalist>
+                            <p class="text-xs text-gray-500 mt-1">Single collection per product.</p>
+                        </div>
+
                         <!-- TYPE -->
                         <div x-data="{ options: {{ $types->pluck('value') }} }">
                             <label class="block text-sm font-bold mb-2">Product Type</label>
@@ -131,52 +113,35 @@
                             <datalist id="typeList"><template x-for="opt in options"><option :value="opt"></option></template></datalist>
                         </div>
 
-                        <!-- VARIANTS (Sizes + Stock) -->
+                        <!-- VARIANTS -->
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="block text-sm font-bold">Size Variants</label>
-                                <button type="button" @click="addVariant()" class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold">
-                                    + Add Size
-                                </button>
+                                <button type="button" @click="addVariant()" class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold">+ Add Size</button>
                             </div>
                             
-                            <!-- Таблица вариантов -->
                             <template x-if="hasVariants">
                                 <div class="space-y-2">
                                     <template x-for="(variant, index) in variants" :key="index">
                                         <div class="flex gap-2 items-center bg-white p-2 rounded border shadow-sm">
-                                            <!-- Size Select (Используем $sizes из контроллера) -->
                                             <div class="w-1/2">
-                                                <select :name="`variants[${index}][size]`" 
-                                                        x-model="variant.size" 
-                                                        class="w-full border p-1 rounded text-sm bg-gray-50 uppercase font-mono" 
-                                                        required>
+                                                <select :name="`variants[${index}][size]`" x-model="variant.size" class="w-full border p-1 rounded text-sm bg-gray-50 uppercase font-mono" required>
                                                     <option value="" disabled>Select Size</option>
                                                     @foreach($sizes as $sizeOption)
                                                         <option value="{{ $sizeOption->value }}">{{ $sizeOption->value }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
-                                            
-                                            <!-- Stock Input -->
                                             <div class="w-1/3 relative">
-                                                <input type="number" 
-                                                       :name="`variants[${index}][stock]`" 
-                                                       x-model="variant.stock" 
-                                                       placeholder="0" 
-                                                       class="w-full border p-1 rounded text-sm pl-8 font-bold" 
-                                                       min="0" required>
+                                                <input type="number" :name="`variants[${index}][stock]`" x-model="variant.stock" @input="calculateTotal()" placeholder="0" class="w-full border p-1 rounded text-sm pl-8 font-bold" min="0" required>
                                                 <span class="absolute left-2 top-1.5 text-gray-400 text-xs">Qty:</span>
                                             </div>
-                                            
-                                            <!-- Remove -->
-                                            <button type="button" @click="removeVariant(index)" class="text-red-400 hover:text-red-600 font-bold px-2" title="Remove">&times;</button>
+                                            <button type="button" @click="removeVariant(index)" class="text-red-400 hover:text-red-600 font-bold px-2">&times;</button>
                                         </div>
                                     </template>
                                 </div>
                             </template>
                             
-                            <!-- Сообщение, если пусто -->
                             <template x-if="!hasVariants">
                                 <div class="text-sm text-gray-400 italic p-3 border border-dashed rounded text-center bg-gray-50">
                                     No size variants added. Stock is managed globally.
@@ -192,15 +157,11 @@
                     </div>
                 </div>
 
-                <!-- ПРАВАЯ КОЛОНКА: ИЗОБРАЖЕНИЯ -->
+                <!-- ПРАВАЯ КОЛОНКА -->
                 <div class="lg:col-span-1">
                     <div class="bg-gray-50 p-4 rounded border sticky top-4">
-                        <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                            📸 Images <span class="text-xs font-normal text-gray-500">(Drag to reorder)</span>
-                        </h3>
+                        <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">📸 Images <span class="text-xs font-normal text-gray-500">(Drag to reorder)</span></h3>
                         <input type="hidden" name="sorted_images_ids" id="sortedImagesIds">
-
-                        <!-- Existing Images -->
                         <div id="existingImageList" class="space-y-2 mb-4 min-h-[20px]">
                             @foreach($product->images as $index => $img)
                                 <div class="relative group bg-white p-2 rounded border flex items-center gap-3 cursor-move shadow-sm hover:shadow-md transition" data-id="{{ $img->id }}">
@@ -217,13 +178,9 @@
                                 </div>
                             @endforeach
                         </div>
-
-                        <!-- New Images Preview -->
                         <div id="newImagePreview" class="space-y-2 mb-4 border-t pt-4 border-dashed border-gray-300 hidden">
                             <p class="text-xs font-bold text-blue-600 uppercase">Ready to upload:</p>
                         </div>
-
-                        <!-- Upload Btn -->
                         <div class="mt-4">
                             <label class="block w-full cursor-pointer bg-blue-50 border-2 border-dashed border-blue-200 rounded p-4 text-center hover:bg-blue-100 transition">
                                 <span class="text-sm font-bold text-blue-600">Click to Select Images</span>
@@ -244,6 +201,8 @@
     </div>
 
     <script>
+        // Alpine Logic (Inline in x-data, no external script needed for basic logic)
+        
         // Image Logic
         const existingList = document.getElementById('existingImageList');
         if (existingList) {

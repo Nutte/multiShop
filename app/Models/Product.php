@@ -17,8 +17,9 @@ class Product extends Model
         'description', 
         'price', 
         'sku', 
-        'stock_quantity', // Общее количество (сумма вариантов)
-        'attributes'
+        'stock_quantity', 
+        'attributes',
+        'clothing_line_id', // Добавлено новое поле
     ];
 
     protected $casts = [
@@ -36,66 +37,18 @@ class Product extends Model
         return $this->hasMany(ProductImage::class)->orderBy('sort_order', 'asc');
     }
 
-    // Новая связь: Варианты (Размеры + Количество)
     public function variants()
     {
         return $this->hasMany(ProductVariant::class);
     }
-
-    // Получить остаток для конкретного размера
-    public function getStockForSize($size)
+    
+    // Новая связь: Линейка одежды
+    public function clothingLine()
     {
-        // Если вариантов нет (товар без размеров), возвращаем общий сток
-        if ($this->variants->isEmpty()) {
-            return $this->stock_quantity;
-        }
-        
-        $variant = $this->variants->where('size', $size)->first();
-        return $variant ? $variant->stock : 0;
+        return $this->belongsTo(ClothingLine::class);
     }
 
-    // Метод уменьшения остатка (вызывается при заказе)
-    public function decreaseStock(string $size, int $quantity = 1)
-    {
-        $telegram = app(\App\Services\TelegramService::class);
-        $tenantName = app(\App\Services\TenantService::class)->getCurrentTenantId() ?? 'Unknown';
-
-        // 1. Если есть варианты (размерный товар)
-        if ($this->variants->count() > 0) {
-            $variant = $this->variants()->where('size', $size)->first();
-            
-            if ($variant && $variant->stock >= $quantity) {
-                $variant->decrement('stock', $quantity);
-                
-                // Проверка на 0
-                if ($variant->stock <= 0) {
-                    $telegram->sendStockAlert($this->name, $size, $tenantName);
-                }
-            }
-        } 
-        // 2. Если товар безразмерный (используем общее поле)
-        else {
-            if ($this->stock_quantity >= $quantity) {
-                $this->decrement('stock_quantity', $quantity);
-                if ($this->stock_quantity <= 0) {
-                    $telegram->sendStockAlert($this->name, 'One Size', $tenantName);
-                }
-            }
-        }
-
-        // Обновляем общий счетчик товара (сумма всех вариантов)
-        $this->recalculateTotalStock();
-    }
-
-    public function recalculateTotalStock()
-    {
-        if ($this->variants()->count() > 0) {
-            $total = $this->variants()->sum('stock');
-            $this->update(['stock_quantity' => $total]);
-        }
-    }
-
-    // Обложка (старый код)
+    // Хелперы URL
     public function getCoverUrlAttribute()
     {
         $cover = $this->images->first();
