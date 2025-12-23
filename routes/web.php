@@ -12,6 +12,8 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\AttributeController;
+// Импортируем наш новый Middleware
+use App\Http\Middleware\AdminTenantMiddleware;
 
 // --- АДМИНКА ---
 Route::domain(config('tenants.admin_domain'))->group(function () {
@@ -23,7 +25,8 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
     });
 
-    Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
+    // ДОБАВЛЕНО: AdminTenantMiddleware::class в список middleware
+    Route::middleware(['auth', AdminTenantMiddleware::class])->prefix('admin')->name('admin.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         
@@ -34,19 +37,16 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
             return back();
         })->name('switch_tenant');
 
-        // USERS: Доступен только Super Admin (проверка внутри контроллера)
         Route::resource('users', UserController::class);
         
         Route::resource('orders', OrderController::class)->only(['index', 'show', 'update']);
         Route::post('/orders/{id}/notify', [OrderController::class, 'sendNotification'])->name('orders.notify');
         
         Route::resource('products', ProductController::class);
-        Route::resource('categories', CategoryController::class); // Использует стандартный {category} -> id
+        Route::resource('categories', CategoryController::class);
         
-        // ATTRIBUTES: Ручные маршруты для точности
         Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
         Route::post('/attributes', [AttributeController::class, 'store'])->name('attributes.store');
-        // ВАЖНО: Явно указываем {id}
         Route::delete('/attributes/{id}', [AttributeController::class, 'destroy'])->name('attributes.destroy');
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

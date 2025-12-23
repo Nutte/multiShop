@@ -11,7 +11,6 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    // Хелпер проверки прав
     private function checkSuperAdmin()
     {
         if (auth()->user()->role !== 'super_admin') {
@@ -23,13 +22,18 @@ class UserController extends Controller
     {
         $this->checkSuperAdmin();
         $users = User::orderBy('id')->get();
-        return view('admin.users.index', compact('users'));
+        // Передаем конфиг тенантов, чтобы отобразить красивые имена магазинов
+        $tenants = config('tenants.tenants');
+        
+        return view('admin.users.index', compact('users', 'tenants'));
     }
 
     public function create()
     {
         $this->checkSuperAdmin();
-        return view('admin.users.create');
+        // Передаем список магазинов для выпадающего списка
+        $tenants = config('tenants.tenants');
+        return view('admin.users.create', compact('tenants'));
     }
 
     public function store(Request $request)
@@ -41,10 +45,25 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'role' => 'required|in:manager,super_admin',
-            'tenant_id' => 'required_if:role,manager',
+            // Если менеджер — tenant_id обязателен и должен существовать в конфиге
+            'tenant_id' => [
+                'required_if:role,manager', 
+                'nullable',
+                function ($attribute, $value, $fail) use ($request) {
+                    // Доп. валидация: если роль менеджер, значение должно быть одним из ключей конфига
+                    if ($request->role === 'manager' && !array_key_exists($value, config('tenants.tenants'))) {
+                        $fail('The selected store is invalid.');
+                    }
+                },
+            ],
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
+
+        // Если роль Супер-Админ, принудительно обнуляем tenant_id
+        if ($validated['role'] === 'super_admin') {
+            $validated['tenant_id'] = null;
+        }
 
         User::create($validated);
 
@@ -55,7 +74,8 @@ class UserController extends Controller
     {
         $this->checkSuperAdmin();
         $user = User::findOrFail($id);
-        return view('admin.users.edit', compact('user'));
+        $tenants = config('tenants.tenants');
+        return view('admin.users.edit', compact('user', 'tenants'));
     }
 
     public function update(Request $request, $id)
@@ -75,6 +95,11 @@ class UserController extends Controller
             $validated['password'] = Hash::make($validated['password']);
         } else {
             unset($validated['password']);
+        }
+
+        // Если роль Супер-Админ, принудительно обнуляем tenant_id
+        if ($validated['role'] === 'super_admin') {
+            $validated['tenant_id'] = null;
         }
 
         $user->update($validated);
