@@ -1,55 +1,94 @@
 <?php
 // FILE: app/Services/ProductService.php
 
-declare(strict_types=1);
-
 namespace App\Services;
 
 use App\Models\Product;
-use Illuminate\Support\Facades\DB;
+use App\Models\ProductImage;
+use Illuminate\Support\Facades\Storage;
 
 class ProductService
 {
-    protected SearchService $searchService;
-
-    public function __construct(SearchService $searchService)
+    // Создание товара
+    public function create(array $data)
     {
-        $this->searchService = $searchService;
-    }
+        // Извлекаем файлы, чтобы они не попали в fillable товара
+        $images = $data['images'] ?? [];
+        unset($data['images']);
 
-    public function create(array $data): Product
-    {
-        return DB::transaction(function () use ($data) {
-            // 1. Сохраняем в PostgreSQL
-            $product = Product::create($data);
+        $product = Product::create($data);
 
-            // 2. Индексируем в Elastic (можно вынести в Job/Queue для скорости, но пока делаем синхронно)
-            try {
-                $this->searchService->indexProduct($product);
-            } catch (\Exception $e) {
-                // Логируем, но не ломаем создание товара, если Elastic недоступен
-                // В продакшене здесь нужен механизм ретраев
-                \Illuminate\Support\Facades\Log::error("Failed to index product {$product->id}: " . $e->getMessage());
+        // Сохраняем изображения
+        if (!empty($images)) {
+            foreach ($images as $index => $file) {
+                $path = $file->store('media', 'tenant');
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'path' => $path,
+                    'sort_order' => $index // Первое загруженное будет 0
+                ]);
             }
-
-            return $product;
-        });
-    }
-    
-    public function search(string $query): \Illuminate\Database\Eloquent\Collection
-    {
-        // 1. Получаем ID из Elastic
-        $ids = $this->searchService->search($query);
-
-        if (empty($ids)) {
-            return new \Illuminate\Database\Eloquent\Collection();
         }
 
-        // 2. Загружаем модели из базы в правильном порядке
-        // FIELD(id, ...) нужен чтобы сохранить релевантность сортировки Elastic
-        $idsString = implode(',', $ids);
-        return Product::whereIn('id', $ids)
-            ->orderByRaw("array_position(ARRAY[{$idsString}], id)") // PostgreSQL синтаксис
-            ->get();
+        return $product;
+    }
+
+    // Обновление товара
+    public function update(Product $product, array $data)
+    {
+        // 1. Новые файлы
+        if (!empty($data['new_images'])) {
+            // Находим текущий максимальный sort_order, чтобы добавить новые в конец
+            $maxOrder = $product->images()->max('sort_order') ?? -1;
+            
+            foreach ($data['new_images'] as $file) {
+                $path = $file->store('media', 'tenant');
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'path' => $path,
+                    'sort_order' => ++$maxOrder
+                ]);
+            }
+        }
+
+        // 2. Удаление файлов (если переданы ID)
+        if (!empty($data['deleted_images'])) {
+            $imagesToDelete = ProductImage::whereIn('id', $data['deleted_images'])
+                                          ->where('product_id', $product->id)
+                                          ->get();
+            
+            foreach ($imagesToDelete as $img) {
+                Storage::disk('tenant')->delete($img->path);
+                $img->delete();
+            }
+        }
+
+        // 3. Сортировка (передан массив ID в нужном порядке)
+        if (!empty($data['sorted_images'])) {
+            $orderMap = array_flip($data['sorted_images']); // [id => index]
+            $images = $product->images()->get();
+            
+            foreach ($images as $img) {
+                if (isset($orderMap[$img->id])) {
+                    $img->update(['sort_order' => $orderMap[$img->id]]);
+                }
+            }
+        }
+
+        // Обновляем основные поля
+        unset($data['new_images'], $data['deleted_images'], $data['sorted_images']);
+        $product->update($data);
+
+        return $product;
+    }
+    
+    // Удаление товара (с файлами)
+    public function delete(Product $product)
+    {
+        foreach ($product->images as $img) {
+            Storage::disk('tenant')->delete($img->path);
+        }
+        $product->images()->delete();
+        $product->delete();
     }
 }

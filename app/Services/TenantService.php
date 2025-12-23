@@ -1,73 +1,57 @@
 <?php
 // FILE: app/Services/TenantService.php
 
-declare(strict_types=1);
-
 namespace App\Services;
 
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage; // Добавлен импорт
 
 class TenantService
 {
-    private ?string $currentTenantId = null;
+    // Статическое свойство для хранения ID, чтобы его видел config
+    protected static ?string $currentTenantId = null;
 
-    /**
-     * Переключает контекст приложения на указанного тенанта (схему БД).
-     */
     public function switchTenant(string $tenantId): void
     {
-        // 1. Проверка существования конфигурации
-        $tenantConfig = config("tenants.tenants.{$tenantId}");
-        if (!$tenantConfig) {
+        $config = config("tenants.tenants.{$tenantId}");
+
+        if (!$config) {
             throw new \Exception("Tenant {$tenantId} not found in config.");
         }
 
-        $this->currentTenantId = $tenantId;
+        // 1. Сохраняем в статику (для config/filesystems.php)
+        self::$currentTenantId = $tenantId;
 
-        // 2. Переключение PostgreSQL (Schema)
-        // Мы меняем search_path. Это заставляет Postgres искать таблицы сначала в схеме тенанта.
-        // public добавляем в конец, чтобы были доступны общие таблицы (если понадобятся).
-        DB::purge('pgsql'); // Закрываем старое соединение
-        Config::set('database.connections.pgsql.search_path', "{$tenantId}, public");
-        DB::reconnect('pgsql'); // Открываем новое с новыми настройками
-
-        // 3. Настройка файловой системы
-        // Путь будет: storage/tenants/{tenant_id}/
+        // 2. Переключаем соединение с БД (search_path)
+        DB::statement("SET search_path TO \"{$tenantId}\""); // Убрали public из пути для строгой изоляции
+        
+        // 3. [ВАЖНО] Динамически обновляем конфиг диска
+        // Это заставит Storage::disk('tenant') смотреть в правильную папку
         Config::set('filesystems.disks.tenant.root', storage_path("tenants/{$tenantId}"));
-        Config::set('filesystems.disks.tenant.url', env('APP_URL') . "/storage/tenants/{$tenantId}");
+        Config::set('filesystems.disks.tenant.url', "/tenants/{$tenantId}");
 
-        // 4. Настройка Redis (Prefix)
-        // Чтобы ключи кэша разных магазинов не пересекались
-        Config::set('database.redis.options.prefix', "trishop_{$tenantId}_");
-        // Пересоздаем фасад Redis, чтобы он подхватил новый префикс (если соединение уже было открыто)
-        try {
-            Redis::connection()->disconnect();
-        } catch (\Exception $e) {
-            // Игнорируем ошибку отключения, если соединения не было
-        }
-
-        // Логируем переключение (полезно для отладки)
-        Log::info("Switched to tenant: {$tenantId}");
+        // 4. [ВАЖНО] Сбрасываем кэшированный инстанс диска, чтобы Laravel пересоздал его с новым конфигом
+        Storage::forgetDisk('tenant');
     }
 
-    /**
-     * Возвращает ID текущего тенанта или null, если мы в глобальной зоне (public).
-     */
     public function getCurrentTenantId(): ?string
     {
-        return $this->currentTenantId;
+        return self::$currentTenantId;
+    }
+    
+    // Метод для вызова из конфиг-файлов
+    public static function getStaticCurrentTenantId(): ?string
+    {
+        return self::$currentTenantId;
     }
 
-    /**
-     * Получить список всех доменов для Middleware
-     */
     public function getDomainMap(): array
     {
+        $tenants = config('tenants.tenants');
         $map = [];
-        foreach (config('tenants.tenants') as $id => $data) {
+        foreach ($tenants as $id => $data) {
             $map[$data['domain']] = $id;
         }
         return $map;

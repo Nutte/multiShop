@@ -24,10 +24,12 @@
             <div class="bg-gray-800 border-2 border-yellow-400 p-4 transform hover:-translate-y-2 transition duration-300 flex flex-col">
                 <a href="{{ route('product.show', $product->slug) }}" class="block flex-1">
                     <div class="h-64 bg-gray-700 mb-4 overflow-hidden flex items-center justify-center relative group">
-                        @if($product->image_path)
-                             <img src="{{ $product->image_url }}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
-                        @else
-                             <span class="text-4xl">👟</span>
+                        <!-- Используем cover_url -->
+                        <img src="{{ $product->cover_url }}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        
+                        <!-- Если картинок больше одной, можно показать вторую при ховере (опционально) -->
+                        @if($product->images->count() > 1)
+                             <img src="{{ $product->images[1]->url }}" class="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition duration-500">
                         @endif
                     </div>
                     <h2 class="text-xl font-bold mb-2">{{ $product->name }}</h2>
@@ -49,4 +51,4 @@
     <div class="mt-8">
         {{ $products->links() }}
     </div>
-@endsection
+@endsection 

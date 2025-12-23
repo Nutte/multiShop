@@ -6,7 +6,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -16,12 +15,10 @@ class Product extends Model
         'name', 
         'slug', 
         'description', 
-        'image_path',
         'price', 
-        // 'category_id' удален
         'sku', 
         'stock_quantity', 
-        'attributes' // JSON оставим для быстрого чтения, но значения будем брать из справочников
+        'attributes'
     ];
 
     protected $casts = [
@@ -34,11 +31,30 @@ class Product extends Model
         return $this->belongsToMany(Category::class);
     }
 
+    public function images()
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order', 'asc');
+    }
+
+    // Основная логика получения обложки
+    public function getCoverUrlAttribute()
+    {
+        // Берем первое изображение из коллекции (благодаря orderBy в связи оно будет с sort_order=0)
+        $cover = $this->images->first();
+        
+        if ($cover) {
+            return $cover->url;
+        }
+        
+        // Дефолтная заглушка, если картинок нет
+        $text = urlencode($this->sku ?? 'Product');
+        return "https://placehold.co/600x600/e2e8f0/1e293b?text={$text}";
+    }
+
+    // --- FIX: Обратная совместимость для админки ---
+    // Этот метод позволяет использовать $product->image_url в старых шаблонах
     public function getImageUrlAttribute()
     {
-        if (!$this->image_path) {
-            return 'https://via.placeholder.com/300x300?text=No+Image';
-        }
-        return Storage::disk('tenant')->url($this->image_path);
+        return $this->cover_url;
     }
 }

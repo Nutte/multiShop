@@ -21,6 +21,17 @@ return [
             'throw' => false,
         ],
 
+        // НАСТРОЙКА ДЛЯ МАГАЗИНОВ
+        'tenant' => [
+            'driver' => 'local',
+            // Физический путь: storage/tenants/{tenant_id}
+            'root' => storage_path('tenants/' . (\App\Services\TenantService::getStaticCurrentTenantId() ?? 'default')),
+            // URL: /tenants/{tenant_id}/... (относительный путь, чтобы работать на любом домене)
+            'url' => '/tenants/' . (\App\Services\TenantService::getStaticCurrentTenantId() ?? 'default'),
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
@@ -32,17 +43,6 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
         ],
-
-        // --- ИСПРАВЛЕННЫЙ ДРАЙВЕР ---
-        'tenant' => [
-            'driver' => 'local',
-            'root' => storage_path('tenants'), 
-            // Теперь URL короче и чище:
-            'url' => env('APP_URL').'/tenants', 
-            'visibility' => 'public',
-            'throw' => false,
-        ],
-        // ----------------------------
 
     ],
 

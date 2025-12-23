@@ -20,6 +20,6 @@ docker compose exec app php artisan tenants:migrate --fresh --seed
 
 # 3. Обновление симлинков
 echo "🔗 Linking storage..."
-docker compose exec app php artisan tenants:link
+docker compose exec app php artisan tenants:link --force
 
 echo "✅ Refresh complete! Admin: http://admin.trishop.local"
