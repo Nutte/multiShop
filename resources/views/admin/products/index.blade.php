@@ -1,18 +1,20 @@
-<!-- FILE: resources/views/admin/products/index.blade.php -->
-@extends('layouts.admin')
-@section('title', 'Products')
+        <!-- FILE: resources/views/admin/products/index.blade.php -->
+        @extends('layouts.admin')
+        @section('title', 'Products')
 
-@section('content')
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h1 class="text-2xl font-bold">Products Manager</h1>
-        <!-- При создании всегда перекидываем на форму (контроллер выберет дефолтный магазин если надо) -->
-        <a href="{{ route('admin.products.create', ['tenant_id' => $currentTenantId]) }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500 flex items-center gap-2">
-            <span>+</span> Add Product
-        </a>
-    </div>
+        @section('content')
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">Products Inventory</h1>
+                
+                <div class="flex gap-4 items-center">
+                    <a href="{{ route('admin.products.create', ['tenant_id' => $currentTenantId]) }}" class="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 shadow">
+                        + Add Product
+                    </a>
+                </div>
+            </div>
 
-    <!-- FILTERS PANEL -->
-    <div class="bg-white p-4 rounded shadow mb-6 border border-gray-200">
+            <!-- Toolbar: Filter -->
+                <div class="bg-white p-4 rounded shadow mb-6 border border-gray-200">
         <form method="GET" action="{{ route('admin.products.index') }}" class="grid grid-cols-1 md:grid-cols-5 gap-4">
             
             <!-- 1. STORE FILTER (Super Admin Only) -->
@@ -83,69 +85,107 @@
         </form>
     </div>
 
-    <!-- TABLE -->
-    <div class="bg-white rounded shadow overflow-hidden">
-        <table class="min-w-full">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Store</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-                @forelse($products as $product)
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4">
-                            <span class="text-xs font-bold uppercase bg-gray-200 px-2 py-1 rounded">{{ $product->tenant_name }}</span>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center">
-                                <img src="{{ $product->image_url }}" alt="" class="h-10 w-10 rounded object-cover border mr-3">
-                                <div>
-                                    <div class="font-bold text-gray-900">{{ $product->name }}</div>
-                                    <div class="text-xs text-gray-500">{{ $product->sku }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 text-xs text-gray-500">
-                            <div>Type: <b>{{ $product->attributes['type'] ?? '-' }}</b></div>
-                            <div class="mt-1">
-                                @foreach($product->categories as $cat)
-                                    <span class="bg-blue-50 text-blue-700 px-1 rounded border border-blue-100">{{ $cat->name }}</span>
-                                @endforeach
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 font-bold">${{ $product->price }}</td>
-                        <td class="px-6 py-4 text-right text-sm">
-                            <a href="{{ $product->preview_url }}" target="_blank" class="text-green-600 hover:text-green-800 mr-3 font-bold">👁️</a>
-                            <!-- Передаем tenant_id, чтобы контроллер знал, в какой базе искать -->
-                            <a href="{{ route('admin.products.edit', ['product' => $product->id, 'tenant_id' => $product->tenant_id]) }}" class="text-blue-600 hover:text-blue-800 mr-3">Edit</a>
-                            
-                            <form action="{{ route('admin.products.destroy', ['product' => $product->id, 'tenant_id' => $product->tenant_id]) }}" method="POST" class="inline-block" onsubmit="return confirm('Delete?');">
-                                @csrf
-                                @method('DELETE')
-                                <button class="text-red-600 hover:text-red-800">Del</button>
-                            </form>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
-                            No products found.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-        
-        <!-- Пагинация показывается только если это не коллекция ALL -->
-        @if($products instanceof \Illuminate\Pagination\LengthAwarePaginator)
-            <div class="p-4 border-t">
-                {{ $products->appends(request()->query())->links() }}
+            <!-- Product List -->
+            <div class="bg-white rounded shadow overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="p-4 text-sm font-bold text-gray-600">Product</th>
+                            <th class="p-4 text-sm font-bold text-gray-600">Price & Offers</th>
+                            <th class="p-4 text-sm font-bold text-gray-600">Stock</th>
+                            <th class="p-4 text-sm font-bold text-gray-600">Category</th>
+                            @if(auth()->user()->role === 'super_admin' && !$currentTenantId)
+                                <th class="p-4 text-sm font-bold text-gray-600">Store</th>
+                            @endif
+                            <th class="p-4 text-sm font-bold text-gray-600 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($products as $product)
+                            <tr class="border-b hover:bg-gray-50 group">
+                                <td class="p-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="relative">
+                                            <img src="{{ $product->cover_url }}" class="h-12 w-12 rounded object-cover border bg-gray-100">
+                                            <!-- PROMO BADGE (Если участвует в промокоде) -->
+                                            @if($product->applicable_promos->isNotEmpty())
+                                                <div class="absolute -top-2 -right-2 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow border border-white" title="Active Promo Code">
+                                                    PROMO
+                                                </div>
+                                            @endif
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-gray-800">{{ $product->name }}</div>
+                                            <div class="text-xs text-gray-500 font-mono">{{ $product->sku }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-4">
+                                    @if($product->has_discount)
+                                        <div class="flex flex-col">
+                                            <span class="text-red-600 font-bold">${{ $product->sale_price }}</span>
+                                            <span class="text-xs text-gray-400 line-through">${{ $product->price }}</span>
+                                        </div>
+                                    @else
+                                        <span class="font-bold">${{ $product->price }}</span>
+                                    @endif
+
+                                    <!-- Text info about Promo -->
+                                    @foreach($product->applicable_promos as $promo)
+                                        <div class="text-[10px] text-purple-600 font-bold mt-1 bg-purple-50 px-1 rounded inline-block">
+                                            code: {{ $promo->code }}
+                                        </div>
+                                    @endforeach
+                                </td>
+                                <td class="p-4">
+                                    @if($product->stock_quantity > 0)
+                                        <span class="text-green-600 font-bold">{{ $product->stock_quantity }}</span>
+                                        <span class="text-xs text-gray-400">in stock</span>
+                                    @else
+                                        <span class="text-red-500 font-bold">Out of Stock</span>
+                                    @endif
+                                </td>
+                                <td class="p-4">
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach($product->categories as $cat)
+                                            <span class="text-xs bg-gray-100 px-2 py-1 rounded">{{ $cat->name }}</span>
+                                        @endforeach
+                                    </div>
+                                    @if($product->clothingLine)
+                                        <div class="mt-1 text-xs text-blue-500 font-bold">
+                                            Line: {{ $product->clothingLine->name }}
+                                        </div>
+                                    @endif
+                                </td>
+                                @if(auth()->user()->role === 'super_admin' && !$currentTenantId)
+                                    <td class="p-4 text-xs text-gray-500">{{ $product->tenant_name }}</td>
+                                @endif
+                                <td class="p-4 text-right">
+                                    <div class="flex justify-end gap-2">
+                                        <a href="{{ $product->preview_url }}" target="_blank" class="text-gray-400 hover:text-blue-600 p-1" title="Preview">
+                                            👁️
+                                        </a>
+                                        <a href="{{ route('admin.products.edit', [$product->id, 'tenant_id' => $product->tenant_id ?? $currentTenantId]) }}" class="text-blue-600 hover:text-blue-800 p-1 font-bold">Edit</a>
+                                        <form action="{{ route('admin.products.destroy', [$product->id, 'tenant_id' => $product->tenant_id ?? $currentTenantId]) }}" method="POST" onsubmit="return confirm('Delete this product?');" class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="text-red-500 hover:text-red-700 p-1 font-bold">&times;</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="p-8 text-center text-gray-400 italic">No products found.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+                <!-- Пагинация показывается только если это не коллекция ALL -->
+                @if($products instanceof \Illuminate\Pagination\LengthAwarePaginator)
+                    <div class="p-4 border-t">
+                        {{ $products->appends(request()->query())->links() }}
+                    </div>
+                @endif
             </div>
-        @endif
-    </div>
-@endsection
+        @endsection

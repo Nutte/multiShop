@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB; // Добавлено для транзакций
+use Illuminate\Support\Facades\DB; // Важно для транзакций
 
 class ProductController extends Controller
 {
@@ -29,32 +29,42 @@ class ProductController extends Controller
         $this->productService = $productService;
     }
 
+    // --- CONTEXT HELPERS (Определение магазина) ---
+
     private function resolveContext(Request $request)
     {
         $user = auth()->user();
+        
+        // Если менеджер - только его магазин
         if ($user->role !== 'super_admin') {
             return $this->tenantService->getCurrentTenantId();
         }
+
+        // Если супер-админ передал ID магазина
         $tenantId = $request->get('tenant_id');
         if ($tenantId) {
             $this->tenantService->switchTenant($tenantId);
             return $tenantId;
         }
+
+        // Если контекст уже установлен
         $current = $this->tenantService->getCurrentTenantId();
         if ($current) return $current;
+
         return null;
     }
 
-    // --- ACTIONS ---
+    // --- ACTIONS (Методы действий) ---
 
     public function index(Request $request)
     {
         $isSuperAdmin = auth()->user()->role === 'super_admin';
         $selectedTenant = $request->get('tenant_id');
         
-        // Режим "ALL STORES"
+        // Режим "ALL STORES" (Только для супер-админа без выбранного магазина)
         if ($isSuperAdmin && empty($selectedTenant)) {
             $products = $this->getAllTenantsProducts($request);
+            // Пустые коллекции для фильтров
             $categories = new Collection(); 
             $sizes = new Collection(); 
             $types = new Collection();
@@ -65,15 +75,18 @@ class ProductController extends Controller
 
         // Режим "SINGLE STORE"
         $currentTenantId = $this->resolveContext($request);
+        
+        // Фоллбек для админа: если магазин не выбран, берем первый
         if (!$currentTenantId && $isSuperAdmin) {
              $first = array_key_first(config('tenants.tenants'));
              $this->tenantService->switchTenant($first);
              $currentTenantId = $first;
         }
 
+        // Запрос товаров с жадной загрузкой связей
         $query = Product::with(['categories', 'images', 'variants', 'clothingLine']);
 
-        // Фильтры
+        // --- Фильтры ---
         if ($request->filled('search')) {
             $query->where(fn($q) => $q->where('name', 'ilike', "%{$request->search}%")->orWhere('sku', 'ilike', "%{$request->search}%"));
         }
@@ -92,6 +105,7 @@ class ProductController extends Controller
 
         $products = $query->latest()->paginate(20)->withQueryString();
         
+        // Добавляем URL предпросмотра
         $tenantDomain = config('tenants.tenants.' . $currentTenantId . '.domain');
         foreach ($products as $product) {
             $product->preview_url = "http://{$tenantDomain}/products/{$product->slug}?preview=true";
@@ -99,6 +113,7 @@ class ProductController extends Controller
             $product->tenant_id = $currentTenantId;
         }
 
+        // Данные для выпадающих списков фильтров
         $categories = Category::orderBy('name')->get();
         $lines = ClothingLine::orderBy('name')->get(); 
         $sizes = AttributeOption::where('type', 'size')->orderBy('value')->get();
@@ -107,6 +122,7 @@ class ProductController extends Controller
         return view('admin.products.index', compact('products', 'categories', 'sizes', 'types', 'lines', 'currentTenantId'));
     }
 
+    // Форма создания/редактирования
     public function form(Request $request, $id = null)
     {
         $currentTenantId = $this->resolveContext($request);
@@ -144,8 +160,10 @@ class ProductController extends Controller
     public function create(Request $request) { return $this->form($request); }
     public function edit(Request $request, $id) { return $this->form($request, $id); }
 
+    // Сохранение нового товара
     public function store(Request $request)
     {
+        // Переключаем магазин, если нужно
         if (auth()->user()->role === 'super_admin' && $request->has('target_tenant')) {
             $this->tenantService->switchTenant($request->target_tenant);
         } else {
@@ -154,13 +172,14 @@ class ProductController extends Controller
 
         $validated = $this->validateProduct($request);
 
-        // Используем транзакцию для атомарности
+        // Используем транзакцию: всё или ничего
         DB::transaction(function () use ($request, $validated) {
             
-            // 1. Считаем сток
+            // 1. Считаем общий сток на основе вариантов
             $variantsInput = $request->input('variants', []);
             $totalStock = 0;
             $sizeList = [];
+            
             foreach ($variantsInput as $v) {
                 if (!empty($v['size'])) {
                     $totalStock += (int)($v['stock'] ?? 0);
@@ -168,16 +187,17 @@ class ProductController extends Controller
                 }
             }
 
-            // 2. Линейка
+            // 2. Находим или создаем Линейку Одежды
             $lineId = $this->resolveClothingLineId($request->clothing_line);
 
-            // 3. Продукт
+            // 3. Создаем продукт (Включая sale_price)
             $product = $this->productService->create([
                 'name' => $validated['name'],
                 'slug' => Str::slug($validated['name']) . '-' . Str::random(4),
                 'price' => $validated['price'],
+                'sale_price' => $validated['sale_price'] ?? null, // Скидка
                 'sku' => $validated['sku'],
-                'stock_quantity' => $totalStock,
+                'stock_quantity' => $totalStock, // Вычисленный сток
                 'description' => $request->input('description'),
                 'clothing_line_id' => $lineId,
                 'attributes' => [
@@ -186,7 +206,7 @@ class ProductController extends Controller
                 ]
             ]);
 
-            // 4. Синхронизация
+            // 4. Синхронизируем связи
             $this->syncAttributesData($request->attributes_type, $sizeList);
             $this->syncCategories($product, $request->categories);
             $this->syncImages($request, $product);
@@ -197,6 +217,7 @@ class ProductController extends Controller
                          ->with('success', 'Product created successfully.');
     }
 
+    // Обновление товара
     public function update(Request $request, $id)
     {
         $this->resolveContext($request);
@@ -206,9 +227,11 @@ class ProductController extends Controller
         
         DB::transaction(function () use ($request, $product, $validated) {
             
+            // 1. Пересчет стока
             $variantsInput = $request->input('variants', []);
             $totalStock = 0;
             $sizeList = [];
+            
             foreach ($variantsInput as $v) {
                 if (!empty($v['size'])) {
                     $totalStock += (int)($v['stock'] ?? 0);
@@ -216,11 +239,14 @@ class ProductController extends Controller
                 }
             }
 
+            // 2. Линейка
             $lineId = $this->resolveClothingLineId($request->clothing_line);
 
+            // 3. Обновление полей (Включая sale_price)
             $product->update([
                 'name' => $validated['name'],
                 'price' => $validated['price'],
+                'sale_price' => $validated['sale_price'] ?? null, // Скидка
                 'sku' => $validated['sku'],
                 'stock_quantity' => $totalStock,
                 'description' => $request->input('description'),
@@ -231,6 +257,7 @@ class ProductController extends Controller
                 ]
             ]);
 
+            // 4. Синхронизация связей
             $this->syncAttributesData($request->attributes_type, $sizeList);
             $this->syncCategories($product, $request->categories);
             $this->syncImagesUpdate($request, $product);
@@ -249,19 +276,23 @@ class ProductController extends Controller
         return back()->with('success', 'Product deleted.');
     }
 
-    // --- PRIVATE HELPERS ---
+    // --- PRIVATE HELPERS (Приватные методы) ---
 
     private function validateProduct(Request $request, $id = null)
     {
         return $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
+            // Скидка должна быть меньше обычной цены
+            'sale_price' => 'nullable|numeric|min:0|lt:price', 
             'sku' => 'required|string|max:50',
             'categories' => 'required|array',
             'attributes_type' => 'required|string',
             'clothing_line' => 'nullable|string|max:255',
+            
             'variants.*.size' => 'required|string',
             'variants.*.stock' => 'required|integer|min:0',
+            
             'images.*' => 'image|max:10240',
             'new_images.*' => 'image|max:10240',
         ]);
@@ -271,7 +302,6 @@ class ProductController extends Controller
     {
         if (empty($name)) return null;
         $slug = Str::slug($name);
-        // firstOrCreate внутри транзакции безопасен
         $line = ClothingLine::firstOrCreate(['slug' => $slug], ['name' => $name]);
         return $line->id;
     }
@@ -313,6 +343,7 @@ class ProductController extends Controller
 
     private function syncImagesUpdate(Request $request, Product $product)
     {
+        // Добавление новых
         if ($request->hasFile('new_images')) {
             $maxOrder = $product->images()->max('sort_order') ?? -1;
             foreach ($request->file('new_images') as $file) {
@@ -320,6 +351,7 @@ class ProductController extends Controller
                 ProductImage::create(['product_id' => $product->id, 'path' => $path, 'sort_order' => ++$maxOrder]);
             }
         }
+        // Удаление выбранных
         if ($request->filled('deleted_images')) {
             $images = ProductImage::whereIn('id', $request->input('deleted_images'))->where('product_id', $product->id)->get();
             foreach ($images as $img) {
@@ -327,6 +359,7 @@ class ProductController extends Controller
                 $img->delete();
             }
         }
+        // Сортировка
         if ($request->filled('sorted_images_ids')) {
             $sortedIds = explode(',', $request->input('sorted_images_ids'));
             foreach ($sortedIds as $index => $imgId) {
@@ -337,7 +370,7 @@ class ProductController extends Controller
 
     private function syncVariants(Product $product, array $variantsInput)
     {
-        // Удаляем старые, пишем новые. При транзакции это безопасно.
+        // Удаляем старые варианты и создаем новые
         $product->variants()->delete();
         foreach ($variantsInput as $v) {
             if (!empty($v['size'])) {
@@ -350,14 +383,15 @@ class ProductController extends Controller
         }
     }
     
-    // Метод getAllTenantsProducts сокращен для краткости, он использует ту же логику что и раньше
+    // Получение товаров со всех магазинов (для Super Admin)
     private function getAllTenantsProducts(Request $request) {
         $allProducts = new Collection();
         foreach (config('tenants.tenants') as $id => $config) {
             try {
                 $this->tenantService->switchTenant($id);
-                // Важно: подгружаем clothingLine здесь тоже
+                // Загружаем вместе с clothingLine
                 $query = Product::with(['categories', 'images', 'variants', 'clothingLine'])->latest()->take(5);
+                
                 if ($request->filled('search')) {
                     $s = $request->search;
                     $query->where(fn($q) => $q->where('name', 'ilike', "%$s%")->orWhere('sku', 'ilike', "%$s%"));

@@ -62,6 +62,11 @@
                    Attributes (Sizes)
                 </a>
 
+                <a href="{{ route('admin.promocodes.index') }}" 
+                   class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.promocodes*') ? 'bg-blue-600 text-white' : '' }}">
+                   Promo Codes
+                </a>
+                
                 <!-- Users -->
                 <div class="pt-4 pb-1 text-xs font-bold text-gray-500 uppercase tracking-wider">
                     System

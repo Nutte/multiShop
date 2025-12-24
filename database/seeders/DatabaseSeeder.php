@@ -76,6 +76,7 @@ class DatabaseSeeder extends Seeder
                 'slug' => Str::slug($data['name']),
                 'description' => $data['description'],
                 'price' => $data['price'],
+                'sale_price' => $data['sale_price'] ?? null,
                 'stock_quantity' => $data['stock'],
                 'attributes' => $attributes,
             ]
@@ -103,6 +104,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Oversized Graffiti Hoodie',
                 'sku' => 'ST-001',
                 'price' => 89.99,
+                'sale_price' => 69.99, // СКИДКА!
                 'stock' => 50,
                 'description' => 'Premium cotton hoodie with urban graffiti print.',
                 'category_name' => 'Hoodies',
@@ -136,6 +138,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Silk Evening Dress',
                 'sku' => 'DH-001',
                 'price' => 450.00,
+                'sale_price' => 69.99, // СКИДКА!
                 'stock' => 10,
                 'description' => 'Elegant black silk dress for special occasions.',
                 'category_name' => 'Dresses',
@@ -169,6 +172,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Tactical Boots Gen-2',
                 'sku' => 'MG-001',
                 'price' => 120.00,
+                'sale_price' => 69.99, // СКИДКА!
                 'stock' => 100,
                 'description' => 'Waterproof tactical boots for harsh terrain.',
                 'category_name' => 'Footwear',

@@ -63,6 +63,8 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
             Route::post('/send-message', [TelegramSettingsController::class, 'sendMessage'])->name('sendMessage');
         });
 
+        Route::resource('promocodes', \App\Http\Controllers\Admin\PromoCodeController::class)->only(['index', 'create', 'store', 'destroy']);
+        
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');

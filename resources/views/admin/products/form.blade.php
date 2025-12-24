@@ -14,7 +14,6 @@
         @endif
     </div>
 
-    <!-- Инициализация данных Alpine.js -->
     <div class="max-w-6xl mx-auto bg-white rounded shadow p-6" 
          x-data="{
             variants: {{ json_encode($product->variants->map(fn($v) => ['size' => $v->size, 'stock' => $v->stock])->values()->all()) }},
@@ -31,7 +30,7 @@
             @if($method !== 'POST') @method($method) @endif
             @if(isset($currentTenantId)) <input type="hidden" name="tenant_id" value="{{ $currentTenantId }}"> @endif
 
-            <!-- ВЫБОР МАГАЗИНА (Super Admin) -->
+            <!-- ВЫБОР МАГАЗИНА -->
             @if(auth()->user()->role === 'super_admin' && !$product->exists)
                 <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
                     <label class="block text-sm font-bold mb-2 text-yellow-800">Target Store</label>
@@ -46,7 +45,6 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <!-- ЛЕВАЯ КОЛОНКА -->
                 <div class="lg:col-span-2 space-y-6">
-                    <!-- General Info -->
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-bold mb-2">Name</label>
@@ -58,19 +56,27 @@
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-2 gap-4">
+                    <!-- PRICES & STOCK -->
+                    <div class="grid grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm font-bold mb-2">Price ($)</label>
+                            <label class="block text-sm font-bold mb-2">Regular Price ($)</label>
                             <input type="number" step="0.01" name="price" value="{{ old('price', $product->price) }}" class="w-full border p-2 rounded" required>
                         </div>
+                        
+                        <!-- SALE PRICE FIELD -->
+                        <div>
+                            <label class="block text-sm font-bold mb-2 text-red-600">Sale Price ($)</label>
+                            <input type="number" step="0.01" name="sale_price" value="{{ old('sale_price', $product->sale_price) }}" class="w-full border p-2 rounded border-red-200 focus:border-red-500" placeholder="Optional">
+                            <p class="text-[10px] text-gray-400 mt-1">Must be lower than Regular Price.</p>
+                        </div>
+
                         <div>
                             <label class="block text-sm font-bold mb-2">Total Stock</label>
                             <input type="number" name="stock_quantity" :value="currentStock" @input="if(!hasVariants) manualStock = $event.target.value" :readonly="hasVariants" :class="hasVariants ? 'bg-gray-100 cursor-not-allowed text-gray-500' : 'bg-white'" class="w-full border p-2 rounded transition" required>
-                            <p class="text-xs text-gray-400 mt-1" x-text="hasVariants ? 'Auto-calculated from variants sum.' : 'Enter stock manually.'"></p>
                         </div>
                     </div>
 
-                    <!-- CLASSIFICATION SECTION -->
+                    <!-- CLASSIFICATION -->
                     <div class="space-y-4 bg-gray-50 p-4 rounded border">
                         <h3 class="font-bold text-gray-700 border-b pb-2 mb-2">Classification & Inventory</h3>
                         
@@ -94,16 +100,13 @@
                              </div>
                         </div>
 
-                        <!-- CLOTHING LINE (Safe Access Fix) -->
+                        <!-- CLOTHING LINE -->
                         <div x-data="{ options: {{ $lines->pluck('name') }} }">
                             <label class="block text-sm font-bold mb-2">Clothing Line / Collection <span class="font-normal text-gray-400">(Optional)</span></label>
                             <input type="text" name="clothing_line" value="{{ old('clothing_line', optional($product->clothingLine)->name) }}" list="lineList" class="w-full border p-2 rounded" placeholder="e.g. Summer 2025">
                             <datalist id="lineList">
-                                <template x-for="opt in options">
-                                    <option :value="opt"></option>
-                                </template>
+                                <template x-for="opt in options"><option :value="opt"></option></template>
                             </datalist>
-                            <p class="text-xs text-gray-500 mt-1">Single collection per product.</p>
                         </div>
 
                         <!-- TYPE -->
@@ -119,7 +122,6 @@
                                 <label class="block text-sm font-bold">Size Variants</label>
                                 <button type="button" @click="addVariant()" class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold">+ Add Size</button>
                             </div>
-                            
                             <template x-if="hasVariants">
                                 <div class="space-y-2">
                                     <template x-for="(variant, index) in variants" :key="index">
@@ -141,7 +143,6 @@
                                     </template>
                                 </div>
                             </template>
-                            
                             <template x-if="!hasVariants">
                                 <div class="text-sm text-gray-400 italic p-3 border border-dashed rounded text-center bg-gray-50">
                                     No size variants added. Stock is managed globally.
@@ -150,14 +151,13 @@
                         </div>
                     </div>
 
-                    <!-- Description -->
                     <div>
                         <label class="block text-sm font-bold mb-2">Description</label>
                         <textarea name="description" class="w-full border p-2 rounded h-32">{{ old('description', $product->description) }}</textarea>
                     </div>
                 </div>
 
-                <!-- ПРАВАЯ КОЛОНКА -->
+                <!-- ПРАВАЯ КОЛОНКА (Images) -->
                 <div class="lg:col-span-1">
                     <div class="bg-gray-50 p-4 rounded border sticky top-4">
                         <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">📸 Images <span class="text-xs font-normal text-gray-500">(Drag to reorder)</span></h3>
@@ -201,9 +201,7 @@
     </div>
 
     <script>
-        // Alpine Logic (Inline in x-data, no external script needed for basic logic)
-        
-        // Image Logic
+        // ... (скрипты изображений остаются те же)
         const existingList = document.getElementById('existingImageList');
         if (existingList) {
             Sortable.create(existingList, {
