@@ -41,6 +41,11 @@
                    Products
                 </a>
 
+                <a href="{{ route('admin.inventory.index') }}" 
+                    class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.inventory*') ? 'bg-gray-700 text-yellow-400' : '' }}">
+                    Inventory Report
+                </a>
+
                 <!-- Classification Group -->
                 <div class="pt-4 pb-1 text-xs font-bold text-gray-500 uppercase tracking-wider">
                     Catalog Management
