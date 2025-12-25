@@ -12,6 +12,7 @@ class Order extends Model
 
     protected $fillable = [
         'order_number',
+        'user_id',          // <--- ДОБАВЛЕНО! Теперь заказ будет привязываться
         'customer_name',
         'customer_email',
         'customer_phone',
@@ -30,6 +31,12 @@ class Order extends Model
     public function items()
     {
         return $this->hasMany(OrderItem::class);
+    }
+    
+    // Связь с пользователем (клиентом)
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     // Хелпер для цветов статуса в админке
