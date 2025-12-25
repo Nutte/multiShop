@@ -3,10 +3,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\TenantService;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\ClothingLine;
+use App\Services\TenantService;
 use Illuminate\Http\Request;
 
 class ShopController extends Controller
@@ -18,69 +18,65 @@ class ShopController extends Controller
         $this->tenantService = $tenantService;
     }
 
-    public function index(Request $request)
+    private function resolveTenant()
     {
-        // Определяем текущий магазин по домену
-        $host = $request->getHost();
-        $map = $this->tenantService->getDomainMap();
-        
-        $tenantId = $map[$host] ?? 'default'; 
-        // Если домен не найден, можно переключить на дефолтный или выбросить 404
-        
-        try {
-            $this->tenantService->switchTenant($tenantId);
-        } catch (\Exception $e) {
-            abort(404, 'Store not found');
-        }
-
-        $query = Product::with(['images', 'clothingLine']); // Жадная загрузка
-
-        // Фильтр по Категории (если есть)
-        if ($request->has('category')) {
-            $query->whereHas('categories', fn($q) => $q->where('slug', $request->category));
-        }
-
-        // НОВЫЙ ФИЛЬТР: По Линейке
-        if ($request->has('line')) {
-            $query->whereHas('clothingLine', fn($q) => $q->where('slug', $request->line));
-        }
-
-        $products = $query->latest()->get();
-        
-        // Для меню
-        $categories = Category::has('products')->get();
-        $lines = ClothingLine::has('products')->get();
-
-        // Выбираем шаблон в зависимости от магазина
-        // resources/views/tenants/{tenant_id}/home.blade.php
-        $view = "tenants.{$tenantId}.home";
-        if (!view()->exists($view)) {
-            $view = 'tenants.default.home'; // Фолбэк
-        }
-
-        return view($view, compact('products', 'categories', 'lines', 'tenantId'));
-    }
-
-    public function show(Request $request, $slug)
-    {
-        // Аналогичное определение тенанта
-        $host = $request->getHost();
+        $host = request()->getHost();
         $map = $this->tenantService->getDomainMap();
         $tenantId = $map[$host] ?? 'default';
         $this->tenantService->switchTenant($tenantId);
+        return $tenantId;
+    }
 
-        $product = Product::with(['images', 'variants', 'clothingLine', 'categories'])->where('slug', $slug)->firstOrFail();
+    public function index(Request $request)
+    {
+        $tenantId = $this->resolveTenant();
+        
+        $query = Product::with('images');
 
+        // Фильтры
+        if ($request->filled('category')) {
+            $query->whereHas('categories', fn($q) => $q->where('slug', $request->category));
+        }
+        
+        if ($request->filled('line')) {
+            $query->whereHas('clothingLine', fn($q) => $q->where('slug', $request->line));
+        }
+
+        // ИСПРАВЛЕНИЕ: Используем paginate() вместо get()
+        $products = $query->latest()->paginate(12)->withQueryString();
+        
+        $categories = Category::has('products')->get();
+        $lines = ClothingLine::has('products')->get();
+
+        // Динамический выбор шаблона
+        $view = "tenants.{$tenantId}.home";
+        if (!view()->exists($view)) {
+            // Фолбэк на простой список, если дизайн не готов
+            return view('shop.fallback_home', compact('products', 'categories', 'lines'));
+        }
+
+        return view($view, compact('products', 'categories', 'lines'));
+    }
+
+    public function show($slug)
+    {
+        $tenantId = $this->resolveTenant();
+        
+        $product = Product::with(['images', 'variants', 'categories', 'clothingLine'])
+            ->where('slug', $slug)
+            ->firstOrFail();
+
+        // Динамический выбор шаблона товара
         $view = "tenants.{$tenantId}.product";
         if (!view()->exists($view)) {
-            $view = 'tenants.default.product';
+             // Можно создать generic product view
+             abort(404, 'Product view not found for this store');
         }
 
         return view($view, compact('product'));
     }
-
-    // Остальные методы (cart, checkout) ...
-    public function cart() { return view('cart.index'); }
-    public function addToCart() { /* ... */ }
-    public function checkout() { /* ... */ }
+    
+    // Методы корзины (cart, addToCart, checkout) перенесены в CartController
+    // Но роуты могут ссылаться сюда, если вы не обновили web.php. 
+    // Убедитесь, что в routes/web.php маршруты ведут на CartController!
 }

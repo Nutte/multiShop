@@ -86,7 +86,10 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
 Route::group([], function () {
     Route::get('/', [ShopController::class, 'index'])->name('home');
     Route::get('/products/{slug}', [ShopController::class, 'show'])->name('product.show');
-    Route::get('/cart', [ShopController::class, 'cart'])->name('cart.index');
-    Route::post('/cart/add', [ShopController::class, 'addToCart'])->name('cart.add');
-    Route::post('/checkout', [ShopController::class, 'checkout'])->name('checkout');
+    // КОРЗИНА И ЗАКАЗ
+    Route::get('/cart', [\App\Http\Controllers\CartController::class, 'index'])->name('cart.index');
+    Route::post('/cart/add', [\App\Http\Controllers\CartController::class, 'addToCart'])->name('cart.add');
+    Route::post('/cart/remove/{rowId}', [\App\Http\Controllers\CartController::class, 'removeFromCart'])->name('cart.remove');
+    Route::post('/cart/promo', [\App\Http\Controllers\CartController::class, 'applyPromo'])->name('cart.promo');
+    Route::post('/checkout', [\App\Http\Controllers\CartController::class, 'checkout'])->name('checkout');
 });

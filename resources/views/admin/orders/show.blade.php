@@ -3,78 +3,121 @@
 @section('title', 'Order ' . $order->order_number)
 
 @section('content')
-    <div class="flex justify-between items-start mb-6">
-        <h1 class="text-2xl font-bold">Order: {{ $order->order_number }}</h1>
-        <a href="{{ route('admin.orders.index') }}" class="text-gray-500 hover:text-gray-700">Back to List</a>
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold flex items-center gap-2">
+            <a href="{{ route('admin.orders.index', ['tenant_id' => request('tenant_id')]) }}" class="text-gray-400 hover:text-gray-600">&larr;</a>
+            Order #{{ $order->order_number }}
+        </h1>
+        <div class="text-sm text-gray-500">
+            Placed on {{ $order->created_at->format('F d, Y H:i') }}
+        </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Order Details -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- LEFT: Items -->
         <div class="lg:col-span-2 space-y-6">
-            <div class="bg-white rounded shadow p-6">
-                <h2 class="font-bold text-lg mb-4">Items</h2>
-                <table class="w-full">
-                    <thead>
-                        <tr class="text-left text-gray-500 text-sm">
-                            <th class="pb-2">Product</th>
-                            <th class="pb-2">Qty</th>
-                            <th class="pb-2 text-right">Price</th>
+            <div class="bg-white rounded shadow overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="p-4 text-xs font-bold uppercase text-gray-500">Product</th>
+                            <th class="p-4 text-xs font-bold uppercase text-gray-500 text-right">Price</th>
+                            <th class="p-4 text-xs font-bold uppercase text-gray-500 text-center">Qty</th>
+                            <th class="p-4 text-xs font-bold uppercase text-gray-500 text-right">Total</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y">
+                    <tbody>
                         @foreach($order->items as $item)
-                        <tr>
-                            <td class="py-3">{{ $item['name'] }}</td>
-                            <td class="py-3">{{ $item['quantity'] }}</td>
-                            <td class="py-3 text-right">${{ $item['price'] }}</td>
-                        </tr>
+                            <tr class="border-b last:border-0">
+                                <td class="p-4">
+                                    <div class="font-bold">{{ $item->product_name }}</div>
+                                    <div class="text-xs text-gray-500">SKU: {{ $item->sku }} | Size: {{ $item->size ?? 'N/A' }}</div>
+                                </td>
+                                <td class="p-4 text-right">${{ $item->price }}</td>
+                                <td class="p-4 text-center">{{ $item->quantity }}</td>
+                                <td class="p-4 text-right font-bold">${{ $item->total }}</td>
+                            </tr>
                         @endforeach
                     </tbody>
-                    <tfoot class="border-t">
+                    <tfoot class="bg-gray-50">
                         <tr>
-                            <td colspan="2" class="pt-4 font-bold text-right">Total:</td>
-                            <td class="pt-4 font-bold text-right text-lg">${{ $order->total_amount }}</td>
+                            <td colspan="3" class="p-4 text-right font-bold">Subtotal:</td>
+                            <td class="p-4 text-right">${{ $order->subtotal }}</td>
+                        </tr>
+                        @if($order->discount_amount > 0)
+                            <tr>
+                                <td colspan="3" class="p-4 text-right font-bold text-green-600">Discount ({{ $order->promo_code }}):</td>
+                                <td class="p-4 text-right text-green-600">-${{ $order->discount_amount }}</td>
+                            </tr>
+                        @endif
+                        <tr class="text-lg">
+                            <td colspan="3" class="p-4 text-right font-bold">Total:</td>
+                            <td class="p-4 text-right font-bold">${{ $order->total_amount }}</td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
         </div>
 
-        <!-- Sidebar Actions -->
-        <div class="space-y-6">
+        <!-- RIGHT: Info & Actions -->
+        <div class="lg:col-span-1 space-y-6">
             <!-- Status Manager -->
-            <div class="bg-white rounded shadow p-6">
-                <h2 class="font-bold text-gray-700 mb-4">Actions</h2>
-                <form action="{{ route('admin.orders.status', $order->id) }}" method="POST" class="mb-4">
+            <div class="bg-white p-6 rounded shadow border-l-4 border-blue-600">
+                <h3 class="font-bold text-gray-700 mb-4">Update Status</h3>
+                <form action="{{ route('admin.orders.update', $order->id) }}" method="POST">
                     @csrf
-                    <label class="block text-xs font-bold text-gray-500 mb-1">Update Status</label>
-                    <div class="flex gap-2">
-                        <select name="status" class="flex-1 border p-2 rounded text-sm">
-                            <option value="new" {{ $order->status == 'new' ? 'selected' : '' }}>New</option>
-                            <option value="processing" {{ $order->status == 'processing' ? 'selected' : '' }}>Processing</option>
-                            <option value="paid" {{ $order->status == 'paid' ? 'selected' : '' }}>Paid</option>
-                            <option value="shipped" {{ $order->status == 'shipped' ? 'selected' : '' }}>Shipped</option>
-                            <option value="cancelled" {{ $order->status == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                        </select>
-                        <button class="bg-blue-600 text-white px-3 rounded text-sm font-bold">Save</button>
+                    @method('PUT')
+                    @if(request('tenant_id')) <input type="hidden" name="tenant_id" value="{{ request('tenant_id') }}"> @endif
+                    
+                    <select name="status" class="w-full border p-2 rounded mb-4 bg-gray-50">
+                        @foreach(['new', 'processing', 'shipped', 'completed', 'cancelled'] as $st)
+                            <option value="{{ $st }}" {{ $order->status === $st ? 'selected' : '' }}>
+                                {{ ucfirst($st) }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <button class="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-500">Update Status</button>
+                </form>
+            </div>
+
+            <!-- Customer Info -->
+            <div class="bg-white p-6 rounded shadow">
+                <h3 class="font-bold text-gray-700 mb-4 border-b pb-2">Customer Details</h3>
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <span class="text-gray-500 block text-xs">Name</span>
+                        <span class="font-bold">{{ $order->customer_name }}</span>
                     </div>
-                </form>
+                    <div>
+                        <span class="text-gray-500 block text-xs">Phone</span>
+                        <a href="tel:{{ $order->customer_phone }}" class="text-blue-600">{{ $order->customer_phone }}</a>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 block text-xs">Email</span>
+                        <a href="mailto:{{ $order->customer_email }}" class="text-blue-600">{{ $order->customer_email }}</a>
+                    </div>
+                </div>
+            </div>
 
-                <hr class="my-4">
-
-                <!-- Integrations -->
-                <form action="{{ route('admin.orders.notify', $order->id) }}" method="POST">
-                    @csrf
-                    <button class="w-full bg-blue-500 text-white py-2 rounded mb-2 text-sm flex items-center justify-center gap-2 hover:bg-blue-400">
-                        <span>✈️</span> Send Telegram Alert
-                    </button>
-                </form>
-                
-                @if($order->status === 'processing' || $order->status === 'paid')
-                    <button disabled class="w-full bg-red-100 text-red-400 py-2 rounded text-sm border border-red-200 cursor-not-allowed">
-                        Create Nova Poshta TTN (No API Key)
-                    </button>
-                @endif
+            <!-- Shipping Info -->
+            <div class="bg-white p-6 rounded shadow">
+                <h3 class="font-bold text-gray-700 mb-4 border-b pb-2">Shipping & Payment</h3>
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <span class="text-gray-500 block text-xs">Method</span>
+                        <span class="font-bold uppercase">{{ str_replace('_', ' ', $order->shipping_method) }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 block text-xs">Address</span>
+                        <div class="bg-gray-50 p-2 rounded border">{{ $order->shipping_address }}</div>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 block text-xs">Payment</span>
+                        <span class="font-bold uppercase badge bg-yellow-100 text-yellow-800 px-2 rounded">
+                            {{ $order->payment_method }}
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

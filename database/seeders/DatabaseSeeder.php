@@ -4,197 +4,219 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Product;
 use App\Models\Category;
-use App\Models\ProductImage;
+use App\Models\ClothingLine;
 use App\Models\AttributeOption;
+use App\Services\TenantService;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
+    {
+        $this->tenantService = $tenantService;
+    }
+
     public function run(): void
     {
-        $schema = DB::connection()->getPdo()->query('SELECT current_schema()')->fetchColumn();
-
-        if ($schema === 'public') {
-            $this->seedUsers();
-            return;
+        // 1. Создаем пользователя (в public схеме)
+        // Для простоты создаем юзера один раз, проверяя существование
+        if (!User::where('email', 'admin@trishop.com')->exists()) {
+            User::create([
+                'name' => 'Super Admin',
+                'email' => 'admin@trishop.com',
+                'password' => bcrypt('password'),
+                'role' => 'super_admin',
+            ]);
         }
 
-        match ($schema) {
-            'street_style' => $this->seedStreetStyle(),
-            'designer_hub' => $this->seedDesignerHub(),
-            'military_gear' => $this->seedMilitaryGear(),
-            default => null,
-        };
+        if (!User::where('email', 'manager@street.com')->exists()) {
+            User::create([
+                'name' => 'Street Manager',
+                'email' => 'manager@street.com',
+                'password' => bcrypt('password'),
+                'role' => 'manager',
+                'tenant_id' => 'street_style',
+            ]);
+        }
+
+        // 2. Наполняем магазины
+        $this->seedStreetStyle();
+        $this->seedDesignerHub();
+        $this->seedMilitaryGear();
     }
 
-    private function seedUsers()
-    {
-        User::firstOrCreate(
-            ['email' => 'admin@trishop.com'],
-            ['name' => 'Super Admin', 'password' => Hash::make('password'), 'role' => 'super_admin', 'tenant_id' => null]
-        );
-
-        $managers = [
-            ['email' => 'manager@street.com', 'tenant' => 'street_style', 'name' => 'Street Manager'],
-            ['email' => 'manager@designer.com', 'tenant' => 'designer_hub', 'name' => 'Designer Manager'],
-            ['email' => 'manager@military.com', 'tenant' => 'military_gear', 'name' => 'Military Manager'],
-        ];
-
-        foreach ($managers as $mgr) {
-            User::firstOrCreate(
-                ['email' => $mgr['email']],
-                ['name' => $mgr['name'], 'password' => Hash::make('password'), 'role' => 'manager', 'tenant_id' => $mgr['tenant']]
-            );
-        }
-    }
-
-    private function seedProduct($data)
-    {
-        $categoryName = $data['category_name'];
-        $slug = Str::slug($categoryName);
-        $category = Category::firstOrCreate(['slug' => $slug], ['name' => $categoryName]);
-
-        $attributes = $data['attributes'] ?? [];
-        if (isset($attributes['type'])) {
-            AttributeOption::firstOrCreate(['type' => 'product_type', 'slug' => Str::slug($attributes['type'])], ['value' => $attributes['type']]);
-        }
-        if (isset($attributes['size'])) {
-            foreach ($attributes['size'] as $size) {
-                AttributeOption::firstOrCreate(['type' => 'size', 'slug' => Str::slug($size)], ['value' => $size]);
-            }
-        }
-
-        $product = Product::firstOrCreate(
-            ['sku' => $data['sku']],
-            [
-                'name' => $data['name'],
-                'slug' => Str::slug($data['name']),
-                'description' => $data['description'],
-                'price' => $data['price'],
-                'sale_price' => $data['sale_price'] ?? null,
-                'stock_quantity' => $data['stock'],
-                'attributes' => $attributes,
-            ]
-        );
-
-        $product->categories()->syncWithoutDetaching([$category->id]);
-
-        // Создаем изображения ТОЛЬКО если их нет
-        if ($product->images()->count() === 0) {
-            foreach ($data['images'] as $index => $path) {
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'path' => $path,
-                    'sort_order' => $index
-                ]);
-            }
-        }
-    }
-
-    // Street Style: Желтый/Черный стиль
+    // --- STREET STYLE ---
     private function seedStreetStyle()
     {
+        $this->tenantService->switchTenant('street_style');
+        if (Product::count() > 0) return; // Не дублируем, если уже есть
+
+        $this->createLine('Urban Summer 2025');
+        
         $products = [
             [
                 'name' => 'Oversized Graffiti Hoodie',
-                'sku' => 'ST-001',
-                'price' => 89.99,
-                'sale_price' => 69.99, // СКИДКА!
-                'stock' => 50,
-                'description' => 'Premium cotton hoodie with urban graffiti print.',
-                'category_name' => 'Hoodies',
-                'attributes' => ['type' => 'Hoodie', 'size' => ['M', 'L', 'XL']],
-                'images' => [
-                    'https://placehold.co/600x800/facc15/000000?text=Graffiti+Hoodie+Front',
-                    'https://placehold.co/600x800/facc15/000000?text=Graffiti+Hoodie+Back'
-                ]
+                'sku' => 'ST-001', 'price' => 89.99, 'sale_price' => 69.99,
+                'category' => 'Hoodies', 'type' => 'Hoodie', 'line' => 'Urban Summer 2025',
+                'sizes' => ['M', 'L', 'XL'],
+                'desc' => 'Cotton hoodie with graffiti print.'
             ],
             [
-                'name' => 'Urban Cargo Pants',
-                'sku' => 'ST-002',
-                'price' => 65.00,
-                'stock' => 30,
-                'description' => 'Black cargo pants with multiple pockets.',
-                'category_name' => 'Pants',
-                'attributes' => ['type' => 'Pants', 'size' => ['30', '32', '34']],
-                'images' => [
-                    'https://placehold.co/600x800/1f2937/ffffff?text=Cargo+Pants'
-                ]
+                'name' => 'Cargo Joggers Black',
+                'sku' => 'ST-002', 'price' => 59.99, 'sale_price' => null,
+                'category' => 'Pants', 'type' => 'Pants', 'line' => 'Urban Summer 2025',
+                'sizes' => ['30', '32', '34'],
+                'desc' => 'Tactical cargo pants with many pockets.'
+            ],
+            [
+                'name' => 'Neon Bucket Hat',
+                'sku' => 'ST-003', 'price' => 25.00, 'sale_price' => null,
+                'category' => 'Accessories', 'type' => 'Hat', 'line' => null,
+                'sizes' => ['One Size'],
+                'desc' => 'Bright neon hat for parties.'
             ]
         ];
-        foreach ($products as $p) $this->seedProduct($p);
+
+        foreach ($products as $p) $this->createProduct($p);
     }
 
-    // Designer Hub: Элегантный Черный/Белый
+    // --- DESIGNER HUB ---
     private function seedDesignerHub()
     {
+        $this->tenantService->switchTenant('designer_hub');
+        if (Product::count() > 0) return;
+
+        $this->createLine('Milano Evening Collection');
+
         $products = [
             [
-                'name' => 'Silk Evening Dress',
-                'sku' => 'DH-001',
-                'price' => 450.00,
-                'sale_price' => 69.99, // СКИДКА!
-                'stock' => 10,
-                'description' => 'Elegant black silk dress for special occasions.',
-                'category_name' => 'Dresses',
-                'attributes' => ['type' => 'Dress', 'size' => ['S', 'M']],
-                'images' => [
-                    'https://placehold.co/600x800/000000/ffffff?text=Silk+Dress',
-                    'https://placehold.co/600x800/333333/ffffff?text=Dress+Detail'
-                ]
+                'name' => 'Silk Evening Gown Red',
+                'sku' => 'DH-501', 'price' => 450.00, 'sale_price' => 399.00,
+                'category' => 'Dresses', 'type' => 'Dress', 'line' => 'Milano Evening Collection',
+                'sizes' => ['XS', 'S', 'M'],
+                'desc' => '100% Italian Silk. Handcrafted in Milan.'
             ],
             [
-                'name' => 'Italian Leather Bag',
-                'sku' => 'DH-002',
-                'price' => 299.99,
-                'stock' => 15,
-                'description' => 'Handcrafted leather bag from Milan.',
-                'category_name' => 'Accessories',
-                'attributes' => ['type' => 'Accessory', 'size' => ['One Size']],
-                'images' => [
-                    'https://placehold.co/600x800/5c3a21/ffffff?text=Leather+Bag'
-                ]
+                'name' => 'Slim Fit Tuxedo',
+                'sku' => 'DH-502', 'price' => 899.00, 'sale_price' => null,
+                'category' => 'Suits', 'type' => 'Suit', 'line' => 'Milano Evening Collection',
+                'sizes' => ['48', '50', '52'],
+                'desc' => 'Classic black tuxedo for formal events.'
+            ],
+            [
+                'name' => 'Diamond Studded Clutch',
+                'sku' => 'DH-503', 'price' => 1200.00, 'sale_price' => null,
+                'category' => 'Bags', 'type' => 'Bag', 'line' => null,
+                'sizes' => ['One Size'],
+                'desc' => 'Limited edition clutch with Swarovski crystals.'
             ]
         ];
-        foreach ($products as $p) $this->seedProduct($p);
+
+        foreach ($products as $p) $this->createProduct($p);
     }
 
-    // Military: Зеленый/Камуфляж
+    // --- MILITARY GEAR ---
     private function seedMilitaryGear()
     {
+        $this->tenantService->switchTenant('military_gear');
+        if (Product::count() > 0) return;
+
+        $this->createLine('Tactical Ops');
+
         $products = [
             [
-                'name' => 'Tactical Boots Gen-2',
-                'sku' => 'MG-001',
-                'price' => 120.00,
-                'sale_price' => 69.99, // СКИДКА!
-                'stock' => 100,
-                'description' => 'Waterproof tactical boots for harsh terrain.',
-                'category_name' => 'Footwear',
-                'attributes' => ['type' => 'Boots', 'size' => ['42', '43', '44', '45']],
-                'images' => [
-                    'https://placehold.co/600x800/3f4f3a/ffffff?text=Tactical+Boots',
-                    'https://placehold.co/600x800/2d3a29/ffffff?text=Boots+Sole'
-                ]
+                'name' => 'Combat Boots Desert',
+                'sku' => 'MG-901', 'price' => 149.99, 'sale_price' => 129.99,
+                'category' => 'Footwear', 'type' => 'Boots', 'line' => 'Tactical Ops',
+                'sizes' => ['42', '43', '44', '45'],
+                'desc' => 'Durable combat boots for rough terrain.'
             ],
             [
-                'name' => 'Camo Field Jacket',
-                'sku' => 'MG-002',
-                'price' => 85.50,
-                'stock' => 60,
-                'description' => 'Durable field jacket with woodland camo pattern.',
-                'category_name' => 'Jackets',
-                'attributes' => ['type' => 'Jacket', 'size' => ['L', 'XL', 'XXL']],
-                'images' => [
-                    'https://placehold.co/600x800/4b5320/ffffff?text=Camo+Jacket'
-                ]
+                'name' => 'Camouflage Tactical Vest',
+                'sku' => 'MG-902', 'price' => 85.00, 'sale_price' => null,
+                'category' => 'Vests', 'type' => 'Vest', 'line' => 'Tactical Ops',
+                'sizes' => ['M', 'L', 'XL'],
+                'desc' => 'Lightweight vest with MOLLE system.'
+            ],
+            [
+                'name' => 'Survival Multi-Tool',
+                'sku' => 'MG-903', 'price' => 45.00, 'sale_price' => null,
+                'category' => 'Equipment', 'type' => 'Tool', 'line' => null,
+                'sizes' => ['One Size'],
+                'desc' => '15-in-1 tool for survival situations.'
             ]
         ];
-        foreach ($products as $p) $this->seedProduct($p);
+
+        foreach ($products as $p) $this->createProduct($p);
+    }
+
+    // --- HELPERS ---
+
+    private function createLine($name)
+    {
+        if (!$name) return null;
+        return ClothingLine::firstOrCreate(['slug' => Str::slug($name)], ['name' => $name]);
+    }
+
+    private function createProduct($data)
+    {
+        // Категория
+        $cat = Category::firstOrCreate(
+            ['slug' => Str::slug($data['category'])],
+            ['name' => $data['category']]
+        );
+
+        // Линейка
+        $lineId = null;
+        if ($data['line']) {
+            $line = ClothingLine::where('name', $data['line'])->first();
+            $lineId = $line ? $line->id : null;
+        }
+
+        // Атрибуты (тип и размер)
+        AttributeOption::firstOrCreate(['type' => 'product_type', 'slug' => Str::slug($data['type'])], ['value' => $data['type']]);
+        foreach ($data['sizes'] as $size) {
+            AttributeOption::firstOrCreate(['type' => 'size', 'slug' => Str::slug($size)], ['value' => $size]);
+        }
+
+        // Продукт
+        $product = Product::create([
+            'name' => $data['name'],
+            'slug' => Str::slug($data['name']),
+            'sku' => $data['sku'],
+            'price' => $data['price'],
+            'sale_price' => $data['sale_price'],
+            'stock_quantity' => 100,
+            'description' => $data['desc'],
+            'clothing_line_id' => $lineId,
+            'attributes' => [
+                'type' => $data['type'],
+                'size' => $data['sizes']
+            ]
+        ]);
+
+        // Связи
+        $product->categories()->attach($cat->id);
+        
+        // Варианты
+        foreach ($data['sizes'] as $size) {
+            $product->variants()->create([
+                'size' => $size,
+                'stock' => 20 // Даем по 20 штук каждого размера
+            ]);
+        }
+
+        // Картинка (заглушка)
+        $text = urlencode($data['name']);
+        $product->images()->create([
+            'path' => "https://placehold.co/600x600/e2e8f0/1e293b?text={$text}",
+            'sort_order' => 0
+        ]);
     }
 }

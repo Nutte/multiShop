@@ -12,15 +12,36 @@ class Order extends Model
 
     protected $fillable = [
         'order_number',
-        'total_amount',
-        'status',
-        'customer_email',
         'customer_name',
-        'items',
+        'customer_email',
+        'customer_phone',
+        'shipping_method',
+        'shipping_address',
+        'subtotal',
+        'discount_amount',
+        'total_amount',
+        'promo_code',
+        'status',
+        'payment_method',
+        'payment_status'
     ];
 
-    protected $casts = [
-        'items' => 'array',
-        'total_amount' => 'decimal:2',
-    ];
+    // Связь с товарами
+    public function items()
+    {
+        return $this->hasMany(OrderItem::class);
+    }
+
+    // Хелпер для цветов статуса в админке
+    public function getStatusColorAttribute()
+    {
+        return match($this->status) {
+            'new' => 'blue',
+            'processing' => 'yellow',
+            'shipped' => 'purple',
+            'completed' => 'green',
+            'cancelled' => 'red',
+            default => 'gray',
+        };
+    }
 }
