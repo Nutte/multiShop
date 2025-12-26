@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\Category;
-use App\Models\ClothingLine;
 use App\Services\TenantService;
 use Illuminate\Http\Request;
 
@@ -27,56 +26,45 @@ class ShopController extends Controller
         return $tenantId;
     }
 
-    public function index(Request $request)
+    public function index()
     {
         $tenantId = $this->resolveTenant();
-        
-        $query = Product::with('images');
 
-        // Фильтры
-        if ($request->filled('category')) {
-            $query->whereHas('categories', fn($q) => $q->where('slug', $request->category));
-        }
-        
-        if ($request->filled('line')) {
-            $query->whereHas('clothingLine', fn($q) => $q->where('slug', $request->line));
-        }
+        // Получаем товары и категории текущего магазина
+        $products = Product::with('clothingLine')
+            ->where('stock_quantity', '>', 0)
+            ->latest()
+            ->paginate(12);
+            
+        $categories = Category::all();
 
-        // ИСПРАВЛЕНИЕ: Используем paginate() вместо get()
-        $products = $query->latest()->paginate(12)->withQueryString();
-        
-        $categories = Category::has('products')->get();
-        $lines = ClothingLine::has('products')->get();
-
-        // Динамический выбор шаблона
+        // ЛОГИКА ВЫБОРА ШАБЛОНА
+        // 1. Ищем уникальный шаблон: resources/views/tenants/{id}/home.blade.php
         $view = "tenants.{$tenantId}.home";
+        
+        // 2. Если его нет (мы их удалили для унификации), берем ОБЩИЙ: resources/views/shop/home.blade.php
         if (!view()->exists($view)) {
-            // Фолбэк на простой список, если дизайн не готов
-            return view('shop.fallback_home', compact('products', 'categories', 'lines'));
+            $view = 'shop.home'; // БЫЛО: shop.fallback_home (ОШИБКА) -> СТАЛО: shop.home
         }
 
-        return view($view, compact('products', 'categories', 'lines'));
+        return view($view, compact('products', 'categories'));
     }
 
     public function show($slug)
     {
         $tenantId = $this->resolveTenant();
-        
-        $product = Product::with(['images', 'variants', 'categories', 'clothingLine'])
-            ->where('slug', $slug)
+
+        $product = Product::where('slug', $slug)
+            ->with(['variants', 'clothingLine', 'images'])
             ->firstOrFail();
 
-        // Динамический выбор шаблона товара
+        // ЛОГИКА ВЫБОРА ШАБЛОНА ТОВАРА
         $view = "tenants.{$tenantId}.product";
+        
         if (!view()->exists($view)) {
-             // Можно создать generic product view
-             abort(404, 'Product view not found for this store');
+            $view = 'shop.product'; // Универсальная страница товара
         }
 
         return view($view, compact('product'));
     }
-    
-    // Методы корзины (cart, addToCart, checkout) перенесены в CartController
-    // Но роуты могут ссылаться сюда, если вы не обновили web.php. 
-    // Убедитесь, что в routes/web.php маршруты ведут на CartController!
 }
