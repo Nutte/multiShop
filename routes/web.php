@@ -15,7 +15,9 @@ use App\Http\Controllers\Admin\TelegramSettingsController;
 use App\Http\Controllers\Admin\ClothingLineController;
 use App\Http\Controllers\Admin\PromoCodeController;
 use App\Http\Controllers\Admin\InventoryController;
+use App\Http\Controllers\Admin\ManagerController; // Не забудьте импортировать
 use App\Http\Middleware\AdminTenantMiddleware;
+use App\Http\Middleware\SuperAdminMiddleware; // Импортируем наш новый Middleware
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\Client\AuthController as ClientAuthController;
 use App\Http\Controllers\Client\ProfileController;
@@ -39,7 +41,14 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
             return back();
         })->name('switch_tenant');
 
-        Route::resource('users', UserController::class);
+        Route::resource('users', UserController::class)->only(['index', 'show', 'update']);
+        
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+        // Используем класс SuperAdminMiddleware::class вместо функции
+        Route::resource('managers', ManagerController::class)
+            ->middleware(SuperAdminMiddleware::class);
+        // -------------------------
+
         Route::resource('orders', OrderController::class)->only(['index', 'show', 'update']);
         Route::post('/orders/{id}/notify', [OrderController::class, 'sendNotification'])->name('orders.notify');
         Route::resource('products', ProductController::class);
@@ -70,8 +79,6 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
 // --- МАГАЗИНЫ (КЛИЕНТСКАЯ ЧАСТЬ) ---
 Route::group([], function () {
     
-    // 1. Сначала специфичные маршруты (чтобы не перекрывались)
-    
     // Auth
     Route::get('/login', [ClientAuthController::class, 'showLogin'])->name('client.login');
     Route::post('/login', [ClientAuthController::class, 'login']);
@@ -84,20 +91,17 @@ Route::group([], function () {
     Route::post('/cart/promo', [CartController::class, 'applyPromo'])->name('cart.promo');
     Route::post('/checkout', [CartController::class, 'checkout'])->name('checkout');
 
-    // Profile (Защищенные маршруты)
+    // Profile
     Route::middleware('auth')->group(function () {
-        // ИЗМЕНЕНО: теперь адрес /user-profile
         Route::get('/user-profile', [ProfileController::class, 'index'])->name('client.profile');
-        
-        // ИЗМЕНЕНО: добавил префикс /my-orders/, чтобы точно не путать с другими ID
         Route::get('/user-profile/orders/{id}', [ProfileController::class, 'showOrder'])->name('client.orders.show');
-        
         Route::post('/user-profile/password', [ClientAuthController::class, 'updatePassword'])->name('client.password.update');
     });
 
-    // 2. Главная страница
+    // Main & Products
     Route::get('/', [ShopController::class, 'index'])->name('home');
-
-    // 3. Маршруты с "wildcard" ({slug}) ставим В САМЫЙ КОНЕЦ
     Route::get('/products/{slug}', [ShopController::class, 'show'])->name('product.show');
+    
+    // Pages (пример добавления страницы)
+    // Route::view('/about', 'shop.pages.about')->name('about');
 });

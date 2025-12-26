@@ -5,116 +5,88 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Order;
+use App\Services\TenantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
-    private function checkSuperAdmin()
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
     {
-        if (auth()->user()->role !== 'super_admin') {
-            abort(403, 'Access denied. Only Super Admin can manage users.');
+        $this->tenantService = $tenantService;
+    }
+
+    // Вспомогательный метод для определения контекста (как в OrderController)
+    private function resolveContext(Request $request)
+    {
+        if (auth()->user()->role === 'super_admin') {
+            $tenantId = $request->get('tenant_id');
+            // Если tenant_id передан, переключаемся. Если нет — остаемся в текущем или дефолтном.
+            if ($tenantId) {
+                $this->tenantService->switchTenant($tenantId);
+                return $tenantId;
+            }
         }
+        return $this->tenantService->getCurrentTenantId();
     }
 
-    public function index()
+    // 1. СПИСОК КЛИЕНТОВ
+    public function index(Request $request)
     {
-        $this->checkSuperAdmin();
-        $users = User::orderBy('id')->get();
-        // Передаем конфиг тенантов, чтобы отобразить красивые имена магазинов
-        $tenants = config('tenants.tenants');
-        
-        return view('admin.users.index', compact('users', 'tenants'));
-    }
+        $currentTenantId = $this->resolveContext($request);
+        $isSuperAdmin = auth()->user()->role === 'super_admin';
 
-    public function create()
-    {
-        $this->checkSuperAdmin();
-        // Передаем список магазинов для выпадающего списка
-        $tenants = config('tenants.tenants');
-        return view('admin.users.create', compact('tenants'));
-    }
+        // Фильтрация
+        $query = User::where('role', 'client')->latest();
 
-    public function store(Request $request)
-    {
-        $this->checkSuperAdmin();
-        
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'role' => 'required|in:manager,super_admin',
-            // Если менеджер — tenant_id обязателен и должен существовать в конфиге
-            'tenant_id' => [
-                'required_if:role,manager', 
-                'nullable',
-                function ($attribute, $value, $fail) use ($request) {
-                    // Доп. валидация: если роль менеджер, значение должно быть одним из ключей конфига
-                    if ($request->role === 'manager' && !array_key_exists($value, config('tenants.tenants'))) {
-                        $fail('The selected store is invalid.');
-                    }
-                },
-            ],
-        ]);
-
-        $validated['password'] = Hash::make($validated['password']);
-
-        // Если роль Супер-Админ, принудительно обнуляем tenant_id
-        if ($validated['role'] === 'super_admin') {
-            $validated['tenant_id'] = null;
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
+            });
         }
 
-        User::create($validated);
+        $users = $query->paginate(20);
 
-        return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
+        return view('admin.users.index', compact('users', 'currentTenantId'));
     }
 
-    public function edit($id)
+    // 2. ПРОФИЛЬ КЛИЕНТА (С историей заказов)
+    public function show(Request $request, $id)
     {
-        $this->checkSuperAdmin();
-        $user = User::findOrFail($id);
-        $tenants = config('tenants.tenants');
-        return view('admin.users.edit', compact('user', 'tenants'));
+        $this->resolveContext($request);
+
+        $user = User::with(['orders' => function($q) {
+            $q->latest();
+        }])->findOrFail($id);
+
+        return view('admin.users.show', compact('user'));
     }
 
+    // 3. СМЕНА ПАРОЛЯ (Админом)
     public function update(Request $request, $id)
     {
-        $this->checkSuperAdmin();
+        $this->resolveContext($request);
         $user = User::findOrFail($id);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'role' => 'required|in:manager,super_admin',
-            'tenant_id' => 'required_if:role,manager',
-            'password' => 'nullable|string|min:6',
-        ]);
+        // Если админ нажал "Сгенерировать новый пароль"
+        if ($request->has('generate_password')) {
+            $newPassword = Str::random(8); // Простой 8-значный пароль
+            
+            $user->update([
+                'password' => Hash::make($newPassword),
+                'access_key' => $newPassword // Обновляем и ключ доступа, чтобы он работал
+            ]);
 
-        if (!empty($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        } else {
-            unset($validated['password']);
+            return back()->with('success', "Password reset successfully. New Key: {$newPassword}");
         }
 
-        // Если роль Супер-Админ, принудительно обнуляем tenant_id
-        if ($validated['role'] === 'super_admin') {
-            $validated['tenant_id'] = null;
-        }
-
-        $user->update($validated);
-
-        return redirect()->route('admin.users.index')->with('success', 'User updated successfully.');
-    }
-
-    public function destroy($id)
-    {
-        $this->checkSuperAdmin();
-        if ($id == auth()->id()) {
-            return back()->with('error', 'You cannot delete yourself.');
-        }
-        
-        User::destroy($id);
-        return back()->with('success', 'User deleted.');
+        return back();
     }
 }

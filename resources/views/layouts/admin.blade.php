@@ -66,16 +66,24 @@
                    class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.attributes*') ? 'bg-gray-700 text-yellow-400' : '' }}">
                    Attributes (Sizes)
                 </a>
+                @if(auth()->user()->role === 'super_admin')
+                    <a href="{{ route('admin.promocodes.index') }}" 
+                    class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.promocodes*') ? 'bg-blue-600 text-white' : '' }}">
+                    Promo Codes
+                    </a>
+                @endif
 
-                <a href="{{ route('admin.promocodes.index') }}" 
-                   class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.promocodes*') ? 'bg-blue-600 text-white' : '' }}">
-                   Promo Codes
-                </a>
-                
                 <!-- Users -->
                 <div class="pt-4 pb-1 text-xs font-bold text-gray-500 uppercase tracking-wider">
                     System
                 </div>
+
+                @if(auth()->user()->role === 'super_admin')
+                    <!-- НОВАЯ ССЫЛКА НА МЕНЕДЖЕРОВ -->
+                    <a href="{{ route('admin.managers.index') }}" class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.managers*') ? 'bg-gray-700 text-yellow-400' : '' }}">
+                        Managers
+                    </a>
+                @endif
 
                 <a href="{{ route('admin.users.index') }}" 
                    class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.users*') ? 'bg-gray-700 text-yellow-400' : '' }}">
