@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-6xl mx-auto py-8">
     
-    <!-- Welcome Banner / New Account Alert -->
+    <!-- Welcome Banner (для новых пользователей) -->
     @if(session('generated_password'))
         <div class="theme-card p-6 mb-8 border-2" style="border-color: var(--color-primary);">
             <h2 class="text-2xl font-bold uppercase mb-2 theme-text">⚠ New Account Details</h2>
@@ -29,37 +29,60 @@
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
         <!-- Sidebar -->
-        <div class="col-span-1 theme-card p-6 h-fit">
-            <h2 class="text-lg font-bold uppercase mb-4 theme-muted border-b theme-border pb-2">My Profile</h2>
-            <div class="mb-6">
-                <p class="font-bold text-lg theme-text">{{ $user->name }}</p>
-                <p class="text-sm theme-muted">{{ $user->phone }}</p>
-            </div>
+        <div class="col-span-1 space-y-6">
             
-            <form action="{{ route('client.logout') }}" method="POST" class="mb-6">
-                @csrf
-                <button class="w-full text-left text-red-500 font-bold hover:opacity-75 uppercase text-xs tracking-widest border border-red-500/30 p-2 rounded">
-                    Disconnect
-                </button>
-            </form>
+            <!-- 1. Данные профиля -->
+            <div class="theme-card p-6">
+                <h2 class="text-lg font-bold uppercase mb-4 theme-muted border-b theme-border pb-2">My Profile</h2>
+                <div class="mb-6">
+                    <p class="font-bold text-lg theme-text">{{ $user->name }}</p>
+                    <p class="text-sm theme-muted font-mono">{{ $user->phone }}</p>
+                </div>
+                
+                <form action="{{ route('client.logout') }}" method="POST" class="mb-6">
+                    @csrf
+                    <button class="w-full text-left text-red-500 font-bold hover:opacity-75 uppercase text-xs tracking-widest border border-red-500/30 p-2 rounded">
+                        Disconnect
+                    </button>
+                </form>
 
-            <h3 class="text-xs font-bold uppercase mb-3 theme-muted">Update Credentials</h3>
-            <form action="{{ route('client.password.update') }}" method="POST" class="space-y-3">
-                @csrf
-                <input type="password" name="current_password" placeholder="Current Password" class="theme-input w-full p-2 text-xs">
-                <input type="password" name="new_password" placeholder="New Password" class="theme-input w-full p-2 text-xs">
-                <input type="password" name="new_password_confirmation" placeholder="Confirm" class="theme-input w-full p-2 text-xs">
-                <button class="theme-btn w-full py-2 text-xs">Save Changes</button>
-            </form>
+                <h3 class="text-xs font-bold uppercase mb-3 theme-muted">Update Credentials</h3>
+                <form action="{{ route('client.password.update') }}" method="POST" class="space-y-3">
+                    @csrf
+                    <input type="password" name="current_password" placeholder="Current Password" class="theme-input w-full p-2 text-xs">
+                    <input type="password" name="new_password" placeholder="New Password" class="theme-input w-full p-2 text-xs">
+                    <input type="password" name="new_password_confirmation" placeholder="Confirm" class="theme-input w-full p-2 text-xs">
+                    <button class="theme-btn w-full py-2 text-xs">Save Changes</button>
+                </form>
+            </div>
+
+            <!-- 2. НОВАЯ ФОРМА ПОДДЕРЖКИ -->
+            <div class="theme-card p-6 border-t-4" style="border-top-color: var(--color-primary);">
+                <h2 class="text-lg font-bold uppercase mb-4 theme-muted">Support</h2>
+                <p class="text-xs theme-muted mb-4">Have a question about an order?</p>
+                
+                <form action="{{ route('contact.store') }}" method="POST" class="space-y-3">
+                    @csrf
+                    <!-- Скрытые поля с данными пользователя -->
+                    <input type="hidden" name="email" value="{{ $user->email }}">
+                    <input type="hidden" name="phone" value="{{ $user->phone }}">
+
+                    <textarea name="message" rows="4" class="theme-input w-full p-2 text-xs" placeholder="Type your message here..." required></textarea>
+                    
+                    <button class="theme-btn w-full py-2 text-xs flex items-center justify-center gap-2">
+                        <span>✉ Send Message</span>
+                    </button>
+                </form>
+            </div>
+
         </div>
 
-        <!-- Main Content -->
+        <!-- Main Content (Orders) -->
         <div class="col-span-3">
             <h1 class="text-3xl font-black uppercase mb-6 theme-skew theme-text">Order History</h1>
             
             @forelse($orders as $order)
                 <div class="theme-card mb-4 p-6 hover:shadow-md transition group relative overflow-hidden">
-                    <!-- Status Badge -->
                     <div class="absolute top-4 right-4">
                         <span class="px-3 py-1 text-[10px] uppercase font-bold theme-bg theme-border border shadow-sm theme-text">
                             {{ $order->status }}

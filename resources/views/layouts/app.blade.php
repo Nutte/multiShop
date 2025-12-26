@@ -146,6 +146,7 @@
             </a>
             <div class="flex gap-6 text-sm font-bold uppercase tracking-wider">
                 <a href="{{ route('home') }}" class="theme-link">Shop</a>
+                <a href="{{ route('contact.index') }}" class="theme-link">Contact</a>
                 @auth
                     <a href="{{ route('client.profile') }}" class="theme-link">Cabinet</a>
                 @else

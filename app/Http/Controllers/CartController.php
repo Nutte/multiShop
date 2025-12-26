@@ -306,18 +306,31 @@ class CartController extends Controller
 
             DB::transaction(function () use ($validated, $normalizedPhone, $subtotal, $discount, $total, $promoCode, $orderItemsData, &$generatedPassword, &$user) {
                 
-                // А) Поиск или регистрация пользователя по нормализованному телефону
                 $user = User::where('phone', $normalizedPhone)->first();
 
                 if (!$user) {
-                    $generatedPassword = Str::random(8); // Генерируем пароль
+                    $generatedPassword = Str::random(8); 
+                    
                     $user = User::create([
                         'name' => $validated['customer_name'],
                         'email' => $validated['customer_email'],
                         'phone' => $normalizedPhone,
                         'password' => Hash::make($generatedPassword),
                         'role' => 'client',
+                        // Сохраняем тот же пароль как "Вечный ключ доступа"
+                        // Laravel зашифрует его автоматически благодаря $casts
+                        'access_key' => $generatedPassword, 
                     ]);
+                } else {
+                    // Если пользователь уже есть, но у него нет ключа (старый юзер),
+                    // можем сгенерировать ему ключ сейчас.
+                    if (!$user->access_key) {
+                         // Генерируем новый ключ, но НЕ меняем основной пароль
+                         $newKey = Str::random(8);
+                         $user->update(['access_key' => $newKey]);
+                         // Передадим его для отображения, но пометим как Key, а не Password
+                         $generatedPassword = $newKey; 
+                    }
                 }
 
                 // Б) Создание заказа с привязкой (user_id)

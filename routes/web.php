@@ -15,12 +15,14 @@ use App\Http\Controllers\Admin\TelegramSettingsController;
 use App\Http\Controllers\Admin\ClothingLineController;
 use App\Http\Controllers\Admin\PromoCodeController;
 use App\Http\Controllers\Admin\InventoryController;
-use App\Http\Controllers\Admin\ManagerController; // Не забудьте импортировать
+use App\Http\Controllers\Admin\ManagerController; 
+use App\Http\Controllers\Admin\ContactMessageController; // NEW
 use App\Http\Middleware\AdminTenantMiddleware;
-use App\Http\Middleware\SuperAdminMiddleware; // Импортируем наш новый Middleware
+use App\Http\Middleware\SuperAdminMiddleware; 
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\Client\AuthController as ClientAuthController;
 use App\Http\Controllers\Client\ProfileController;
+use App\Http\Controllers\Client\ContactController; // NEW
 
 // --- АДМИН ПАНЕЛЬ ---
 Route::domain(config('tenants.admin_domain'))->group(function () {
@@ -43,14 +45,16 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
 
         Route::resource('users', UserController::class)->only(['index', 'show', 'update']);
         
-        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        // Используем класс SuperAdminMiddleware::class вместо функции
         Route::resource('managers', ManagerController::class)
             ->middleware(SuperAdminMiddleware::class);
-        // -------------------------
 
         Route::resource('orders', OrderController::class)->only(['index', 'show', 'update']);
         Route::post('/orders/{id}/notify', [OrderController::class, 'sendNotification'])->name('orders.notify');
+        
+        // --- СООБЩЕНИЯ (НОВОЕ) ---
+        Route::resource('messages', ContactMessageController::class)->only(['index', 'show', 'destroy']);
+        // -------------------------
+
         Route::resource('products', ProductController::class);
         Route::resource('categories', CategoryController::class);
         Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
@@ -98,10 +102,12 @@ Route::group([], function () {
         Route::post('/user-profile/password', [ClientAuthController::class, 'updatePassword'])->name('client.password.update');
     });
 
+    // --- КОНТАКТЫ (НОВОЕ) ---
+    Route::get('/contact', [ContactController::class, 'index'])->name('contact.index');
+    Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
+    // -------------------------
+
     // Main & Products
     Route::get('/', [ShopController::class, 'index'])->name('home');
     Route::get('/products/{slug}', [ShopController::class, 'show'])->name('product.show');
-    
-    // Pages (пример добавления страницы)
-    // Route::view('/about', 'shop.pages.about')->name('about');
 });

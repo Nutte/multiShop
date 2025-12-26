@@ -35,6 +35,11 @@
                    Orders
                 </a>
 
+                <a href="{{ route('admin.messages.index') }}" 
+                    class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.messages*') ? 'bg-gray-700 text-yellow-400' : '' }}">
+                    Messages
+                </a>
+
                 <!-- Products -->
                 <a href="{{ route('admin.products.index') }}" 
                    class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.products*') ? 'bg-gray-700 text-yellow-400' : '' }}">
