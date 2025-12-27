@@ -39,7 +39,7 @@ return new class extends Migration
             
             // Статус
             $table->string('status')->default('new'); // new, processing, shipped, completed, cancelled
-            
+            $table->boolean('is_instagram')->default(false);
             $table->timestamps();
         });
 

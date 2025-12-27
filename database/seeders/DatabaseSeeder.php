@@ -11,6 +11,7 @@ use App\Models\ClothingLine;
 use App\Models\AttributeOption;
 use App\Services\TenantService;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
@@ -24,28 +25,55 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        // 1. Создаем пользователя (в public схеме)
-        // Для простоты создаем юзера один раз, проверяя существование
-        if (!User::where('email', 'admin@trishop.com')->exists()) {
-            User::create([
+        // ==========================================
+        // 1. СОЗДАНИЕ СУПЕР-АДМИНА (PUBLIC СХЕМА)
+        // ==========================================
+        
+        // ВАЖНО: Используем admin@trishop.com, как вы просили
+        $adminEmail = 'admin@trishop.com';
+        
+        // firstOrCreate предотвращает дублирование, если сидер запущен повторно
+        $admin = User::firstOrCreate(
+            ['email' => $adminEmail],
+            [
                 'name' => 'Super Admin',
-                'email' => 'admin@trishop.com',
-                'password' => bcrypt('password'),
+                'phone' => '+380000000000',
+                'password' => Hash::make('password'), // Пароль
                 'role' => 'super_admin',
-            ]);
+                'tenant_id' => null, // Доступ ко всем магазинам
+                'access_key' => 'password', // Ключ для тестов
+            ]
+        );
+
+        // Если пользователь существовал, но пароль не подходил, можно принудительно обновить:
+        if ($admin->wasRecentlyCreated === false) {
+             $admin->update([
+                 'password' => Hash::make('password'),
+                 'access_key' => 'password',
+                 'role' => 'super_admin'
+             ]);
         }
 
-        if (!User::where('email', 'manager@street.com')->exists()) {
-            User::create([
+        // ==========================================
+        // 2. СОЗДАНИЕ МЕНЕДЖЕРА
+        // ==========================================
+        $managerEmail = 'manager@street.local';
+
+        User::firstOrCreate(
+            ['email' => $managerEmail],
+            [
                 'name' => 'Street Manager',
-                'email' => 'manager@street.com',
-                'password' => bcrypt('password'),
+                'phone' => '+380999999999',
+                'password' => Hash::make('password'),
                 'role' => 'manager',
                 'tenant_id' => 'street_style',
-            ]);
-        }
+                'access_key' => 'password',
+            ]
+        );
 
-        // 2. Наполняем магазины
+        // ==========================================
+        // 3. НАПОЛНЕНИЕ МАГАЗИНОВ
+        // ==========================================
         $this->seedStreetStyle();
         $this->seedDesignerHub();
         $this->seedMilitaryGear();
@@ -55,7 +83,7 @@ class DatabaseSeeder extends Seeder
     private function seedStreetStyle()
     {
         $this->tenantService->switchTenant('street_style');
-        if (Product::count() > 0) return; // Не дублируем, если уже есть
+        if (Product::count() > 0) return;
 
         $this->createLine('Urban Summer 2025');
         
@@ -108,13 +136,6 @@ class DatabaseSeeder extends Seeder
                 'category' => 'Suits', 'type' => 'Suit', 'line' => 'Milano Evening Collection',
                 'sizes' => ['48', '50', '52'],
                 'desc' => 'Classic black tuxedo for formal events.'
-            ],
-            [
-                'name' => 'Diamond Studded Clutch',
-                'sku' => 'DH-503', 'price' => 1200.00, 'sale_price' => null,
-                'category' => 'Bags', 'type' => 'Bag', 'line' => null,
-                'sizes' => ['One Size'],
-                'desc' => 'Limited edition clutch with Swarovski crystals.'
             ]
         ];
 
@@ -143,13 +164,6 @@ class DatabaseSeeder extends Seeder
                 'category' => 'Vests', 'type' => 'Vest', 'line' => 'Tactical Ops',
                 'sizes' => ['M', 'L', 'XL'],
                 'desc' => 'Lightweight vest with MOLLE system.'
-            ],
-            [
-                'name' => 'Survival Multi-Tool',
-                'sku' => 'MG-903', 'price' => 45.00, 'sale_price' => null,
-                'category' => 'Equipment', 'type' => 'Tool', 'line' => null,
-                'sizes' => ['One Size'],
-                'desc' => '15-in-1 tool for survival situations.'
             ]
         ];
 
@@ -166,26 +180,22 @@ class DatabaseSeeder extends Seeder
 
     private function createProduct($data)
     {
-        // Категория
         $cat = Category::firstOrCreate(
             ['slug' => Str::slug($data['category'])],
             ['name' => $data['category']]
         );
 
-        // Линейка
         $lineId = null;
         if ($data['line']) {
             $line = ClothingLine::where('name', $data['line'])->first();
             $lineId = $line ? $line->id : null;
         }
 
-        // Атрибуты (тип и размер)
         AttributeOption::firstOrCreate(['type' => 'product_type', 'slug' => Str::slug($data['type'])], ['value' => $data['type']]);
         foreach ($data['sizes'] as $size) {
             AttributeOption::firstOrCreate(['type' => 'size', 'slug' => Str::slug($size)], ['value' => $size]);
         }
 
-        // Продукт
         $product = Product::create([
             'name' => $data['name'],
             'slug' => Str::slug($data['name']),
@@ -201,18 +211,15 @@ class DatabaseSeeder extends Seeder
             ]
         ]);
 
-        // Связи
         $product->categories()->attach($cat->id);
         
-        // Варианты
         foreach ($data['sizes'] as $size) {
             $product->variants()->create([
                 'size' => $size,
-                'stock' => 20 // Даем по 20 штук каждого размера
+                'stock' => 20
             ]);
         }
 
-        // Картинка (заглушка)
         $text = urlencode($data['name']);
         $product->images()->create([
             'path' => "https://placehold.co/600x600/e2e8f0/1e293b?text={$text}",
