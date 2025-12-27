@@ -1,5 +1,5 @@
 <?php
-// File - app/Http/Controllers/Admin/OrderController.php
+// FILE: app/Http/Controllers/Admin/OrderController.php
 
 namespace App\Http\Controllers\Admin;
 
@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\TenantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -50,6 +51,7 @@ class OrderController extends Controller
             return view('admin.orders.index', compact('orders', 'currentTenantId'));
         }
 
+        // Агрегация для Супер-Админа
         $allOrders = collect();
         foreach (config('tenants.tenants') as $tenantId => $config) {
             try {
@@ -97,9 +99,11 @@ class OrderController extends Controller
         }
 
         $productsCatalog = [];
+        $customers = []; 
 
         if ($currentTenantId) {
             try {
+                // 1. Загружаем товары
                 $this->tenantService->switchTenant($currentTenantId);
                 $products = Product::with('variants')->where('stock_quantity', '>', 0)->get();
                 
@@ -110,12 +114,20 @@ class OrderController extends Controller
                     $prodData['variants'] = $prod->variants->toArray();
                     $productsCatalog[] = $prodData;
                 }
+
+                // 2. Загружаем клиентов
+                $customers = User::where('role', 'client')
+                    ->select('id', 'name', 'phone', 'email')
+                    ->orderBy('name')
+                    ->get();
+
             } catch (\Exception $e) {}
         }
 
         return view('admin.orders.form', [
             'order' => null,
             'productsJson' => $productsCatalog,
+            'customersJson' => $customers,
             'isSuperAdmin' => $isSuperAdmin,
             'currentTenantId' => $currentTenantId
         ]);
@@ -123,8 +135,16 @@ class OrderController extends Controller
 
     public function store(Request $request)
     {
+        // ИСПРАВЛЕНИЕ: Сначала переключаем магазин, потом валидируем пользователя.
+        // Иначе exists:users,id ищет в public схеме, а клиент в схеме магазина.
+        $tenantId = $request->input('tenant_id');
+        if ($tenantId) {
+            $this->tenantService->switchTenant($tenantId);
+        }
+
         $validated = $request->validate([
             'tenant_id' => 'required|string',
+            'user_id' => 'nullable|exists:users,id', // Теперь проверка пойдет в правильной схеме
             'customer_name' => 'required|string',
             'customer_phone' => 'required|string',
             'customer_email' => 'nullable|email',
@@ -135,20 +155,28 @@ class OrderController extends Controller
             'items.*.product_id' => 'required',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric',
-            'items.*.size' => 'nullable', // Разрешаем null, обработаем в saveOrderItems
+            'items.*.size' => 'nullable',
         ]);
 
-        $this->tenantService->switchTenant($validated['tenant_id']);
+        // Если выбран пользователь, перезаписываем данные из профиля
+        if (!empty($validated['user_id'])) {
+            $user = User::find($validated['user_id']);
+            if ($user) {
+                $validated['customer_name'] = $user->name;
+                $validated['customer_phone'] = $user->phone;
+                $validated['customer_email'] = $user->email;
+            }
+        }
 
         DB::transaction(function () use ($validated) {
             $total = 0;
             foreach ($validated['items'] as $item) $total += $item['price'] * $item['quantity'];
 
-            // Безопасное получение email
             $email = !empty($validated['customer_email']) ? $validated['customer_email'] : null;
 
             $order = Order::create([
                 'order_number' => 'ORD-' . date('Ymd') . '-' . strtoupper(Str::random(5)),
+                'user_id' => $validated['user_id'] ?? null,
                 'customer_name' => $validated['customer_name'],
                 'customer_phone' => $validated['customer_phone'],
                 'customer_email' => $email,
@@ -182,9 +210,15 @@ class OrderController extends Controller
             $productsCatalog[] = $prodData;
         }
 
+        $customers = User::where('role', 'client')
+            ->select('id', 'name', 'phone', 'email')
+            ->orderBy('name')
+            ->get();
+
         return view('admin.orders.form', [
             'order' => $order,
             'productsJson' => $productsCatalog,
+            'customersJson' => $customers,
             'isSuperAdmin' => auth()->user()->role === 'super_admin',
             'currentTenantId' => $tenantId
         ]);
@@ -210,6 +244,7 @@ class OrderController extends Controller
         }
 
         $validated = $request->validate([
+            'user_id' => 'nullable|exists:users,id',
             'customer_name' => 'required|string',
             'customer_phone' => 'required|string',
             'customer_email' => 'nullable|email',
@@ -220,14 +255,21 @@ class OrderController extends Controller
             'items' => 'nullable|array', 
         ]);
 
+        if (!empty($validated['user_id'])) {
+            $user = User::find($validated['user_id']);
+            if ($user) {
+                $validated['customer_name'] = $user->name;
+                $validated['customer_phone'] = $user->phone;
+                $validated['customer_email'] = $user->email;
+            }
+        }
+
         DB::transaction(function () use ($order, $validated, $request) {
             if ($request->has('items') && count($request->input('items')) > 0) {
-                // Возврат старых товаров на склад перед удалением
                 foreach ($order->items as $oldItem) {
                     $this->adjustStock($oldItem->product_id, $oldItem->size, $oldItem->quantity, 'increment');
                 }
                 $order->items()->delete();
-                
                 $total = $this->saveOrderItems($order, $request->input('items'));
                 $order->update(['subtotal' => $total, 'total_amount' => $total]);
             }
@@ -237,6 +279,7 @@ class OrderController extends Controller
             $email = !empty($validated['customer_email']) ? $validated['customer_email'] : $order->customer_email;
 
             $order->update([
+                'user_id' => $validated['user_id'] ?? $order->user_id,
                 'customer_name' => $validated['customer_name'],
                 'customer_phone' => $validated['customer_phone'],
                 'customer_email' => $email,
@@ -260,7 +303,6 @@ class OrderController extends Controller
         }
     }
 
-    // ВАЖНО: Исправленная логика сохранения
     private function saveOrderItems($order, $itemsData) {
         $total = 0;
         foreach ($itemsData as $data) {
@@ -270,14 +312,10 @@ class OrderController extends Controller
             $lineTotal = $data['price'] * $data['quantity'];
             $total += $lineTotal;
 
-            // Логика определения размера:
-            // 1. Если у товара НЕТ вариантов -> размер 'One Size', даже если пришло что-то другое
-            // 2. Если у товара ЕСТЬ варианты -> берем переданный размер. Если не передан - ошибка или дефолт
             $hasVariants = $product->variants->isNotEmpty();
             
             if ($hasVariants) {
                 $size = !empty($data['size']) ? $data['size'] : null;
-                // Если размер обязателен, но не передан - можно либо кинуть ошибку, либо взять первый доступный
                 if (!$size) $size = $product->variants->first()->size;
             } else {
                 $size = 'One Size';
@@ -294,23 +332,16 @@ class OrderController extends Controller
                 'total' => $lineTotal,
             ]);
             
-            // Списываем сток
             $this->adjustStock($product, $size, $data['quantity'], 'decrement');
         }
         return $total;
     }
 
-    // Принимает либо ID, либо объект Product
     private function adjustStock($productOrId, $size, $qty, $action) {
         $product = ($productOrId instanceof Product) ? $productOrId : Product::find($productOrId);
         if (!$product) return;
-
         $method = $action === 'increment' ? 'increment' : 'decrement';
-        
-        // 1. Общий сток товара
         $product->$method('stock_quantity', $qty);
-        
-        // 2. Сток варианта (если есть)
         if ($size && $size !== 'One Size') {
             $v = $product->variants()->where('size', $size)->first();
             if ($v) $v->$method('stock', $qty);

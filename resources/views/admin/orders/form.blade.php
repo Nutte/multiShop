@@ -18,7 +18,7 @@
     <div class="max-w-2xl mx-auto mt-10">
         <div class="bg-white p-8 rounded shadow-lg border-t-4 border-blue-600 text-center">
             <h1 class="text-2xl font-bold mb-4">Start New Order</h1>
-            <p class="text-gray-500 mb-6">Select a store to load products.</p>
+            <p class="text-gray-500 mb-6">Select a store to load products and customers.</p>
             <div class="inline-block w-full max-w-md text-left">
                 <select onchange="if(this.value) window.location.href = '{{ route('admin.orders.create') }}?tenant_id=' + this.value"
                         class="w-full border p-3 rounded bg-yellow-50 border-yellow-300 font-bold text-gray-800">
@@ -58,17 +58,41 @@
                     <div class="bg-white p-4 rounded shadow">
                         <h3 class="font-bold text-gray-700 mb-3 border-b pb-2 uppercase text-xs">Customer</h3>
                         <div class="space-y-3">
+                            <!-- ВЫБОР КЛИЕНТА С ФИКСОМ ОТОБРАЖЕНИЯ -->
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 mb-1">Link to Profile (Optional)</label>
+                                <select name="user_id" 
+                                        x-model="selectedUserId" 
+                                        @change="updateCustomerFields()" 
+                                        x-init="$nextTick(() => { if(selectedUserId) $el.value = selectedUserId })"
+                                        class="w-full border p-2 rounded text-sm bg-blue-50 border-blue-200 font-bold text-blue-900 focus:outline-none focus:border-blue-400">
+                                    <option value="">-- Guest / New Customer --</option>
+                                    <template x-for="c in customers" :key="c.id">
+                                        <option :value="String(c.id)" x-text="c.name + ' (' + c.phone + ')'"></option>
+                                    </template>
+                                </select>
+                                <p class="text-[10px] text-gray-400 mt-1">Selecting a user will lock Name, Phone and Email to their profile data.</p>
+                            </div>
+
+                            <hr class="border-gray-100 my-2">
+
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 mb-1">Name</label>
-                                <input type="text" name="customer_name" value="{{ old('customer_name', $order->customer_name ?? '') }}" class="w-full border p-2 rounded text-sm" required>
+                                <input type="text" name="customer_name" x-model="customer_name" :readonly="!!selectedUserId" 
+                                       class="w-full border p-2 rounded text-sm transition"
+                                       :class="{'bg-gray-100 text-gray-500 cursor-not-allowed': !!selectedUserId}" required>
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 mb-1">Phone</label>
-                                <input type="text" name="customer_phone" value="{{ old('customer_phone', $order->customer_phone ?? '') }}" class="w-full border p-2 rounded text-sm" required>
+                                <input type="text" name="customer_phone" x-model="customer_phone" :readonly="!!selectedUserId" 
+                                       class="w-full border p-2 rounded text-sm transition"
+                                       :class="{'bg-gray-100 text-gray-500 cursor-not-allowed': !!selectedUserId}" required>
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 mb-1">Email</label>
-                                <input type="email" name="customer_email" value="{{ old('customer_email', $order->customer_email ?? '') }}" class="w-full border p-2 rounded text-sm">
+                                <input type="email" name="customer_email" x-model="customer_email" :readonly="!!selectedUserId" 
+                                       class="w-full border p-2 rounded text-sm transition"
+                                       :class="{'bg-gray-100 text-gray-500 cursor-not-allowed': !!selectedUserId}">
                             </div>
                         </div>
                     </div>
@@ -134,7 +158,6 @@
                                 <template x-for="(row, index) in rows" :key="index">
                                     <tr class="border-b hover:bg-gray-50 transition">
                                         <td class="p-2 align-top">
-                                            <!-- Добавлен x-init для принудительной установки значения после рендера опций -->
                                             <select :name="'items['+index+'][product_id]'" 
                                                     x-model="row.product_id" 
                                                     @change="updateRow(index)"
@@ -200,14 +223,23 @@
     <script>
         function orderManager() {
             return {
-                catalog: (@json($productsJson)).map(p => ({...p, id: String(p.id)})),
+                // Преобразуем ID в строки для стабильного сравнения в x-model
+                catalog: (@json($productsJson ?? [])).map(p => ({...p, id: String(p.id)})),
+                customers: (@json($customersJson ?? [])).map(c => ({...c, id: String(c.id)})),
+                
                 rows: [],
+                
+                // Данные клиента
+                selectedUserId: '{{ $order->user_id ?? "" }}',
+                customer_name: '{{ old("customer_name", $order->customer_name ?? "") }}',
+                customer_phone: '{{ old("customer_phone", $order->customer_phone ?? "") }}',
+                customer_email: '{{ old("customer_email", $order->customer_email ?? "") }}',
 
                 init() {
+                    // Инициализация строк товаров
                     @if($isEdit)
                         const itemsFromDb = @json($order->items);
-                        
-                        // Сначала создаем пустые строки, чтобы Alpine успел инициализировать таблицу
+                        // Сначала создаем пустые структуры
                         this.rows = itemsFromDb.map(item => ({
                             product_id: '', 
                             size: '', 
@@ -216,7 +248,7 @@
                             variants: [] 
                         }));
 
-                        // Через тик заполняем реальными данными — это гарантирует, что список <option> уже готов
+                        // Затем заполняем данные через тик
                         this.$nextTick(() => {
                             this.rows.forEach((row, index) => {
                                 const dbItem = itemsFromDb[index];
@@ -229,9 +261,27 @@
                                 row.price = dbItem.price;
                             });
                         });
+                        
+                        // Если есть привязанный юзер, форсируем его выбор тоже через тик
+                        if (this.selectedUserId) {
+                            this.selectedUserId = String(this.selectedUserId);
+                        }
                     @else
                         this.addRow();
                     @endif
+                },
+                
+                // Метод автозаполнения клиента
+                updateCustomerFields() {
+                    const user = this.customers.find(c => c.id === String(this.selectedUserId));
+                    if (user) {
+                        this.customer_name = user.name;
+                        this.customer_phone = user.phone;
+                        this.customer_email = user.email || '';
+                    } else {
+                        // Если Guest выбран вручную - поля остаются доступными для ввода
+                        this.selectedUserId = '';
+                    }
                 },
 
                 get total() {
