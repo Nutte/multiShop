@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\Order;
 use App\Services\TenantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -20,30 +21,51 @@ class UserController extends Controller
         $this->tenantService = $tenantService;
     }
 
-    // Вспомогательный метод для определения контекста (как в OrderController)
-    private function resolveContext(Request $request)
+    // Хелпер для нормализации телефона (Украина)
+    private function normalizePhone($phone)
     {
-        if (auth()->user()->role === 'super_admin') {
-            $tenantId = $request->get('tenant_id');
-            // Если tenant_id передан, переключаемся. Если нет — остаемся в текущем или дефолтном.
-            if ($tenantId) {
-                $this->tenantService->switchTenant($tenantId);
-                return $tenantId;
-            }
+        // Удаляем все кроме цифр
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        
+        // Если начинается с 380... -> +380...
+        if (str_starts_with($phone, '380')) {
+            return '+' . $phone;
         }
-        return $this->tenantService->getCurrentTenantId();
+        // Если начинается с 0... (097...) -> +380...
+        if (str_starts_with($phone, '0')) {
+            return '+38' . $phone;
+        }
+        
+        // В остальных случаях возвращаем как есть (или добавляем +)
+        return '+' . $phone;
     }
 
-    // 1. СПИСОК КЛИЕНТОВ
+    private function switchToPublic()
+    {
+        DB::statement('SET search_path TO public');
+    }
+
     public function index(Request $request)
     {
-        $currentTenantId = $this->resolveContext($request);
-        $isSuperAdmin = auth()->user()->role === 'super_admin';
+        // 1. Принудительно ищем пользователей в PUBLIC схеме
+        $this->switchToPublic();
 
-        // Фильтрация
         $query = User::where('role', 'client')->latest();
 
-        if ($request->filled('search')) {
+        // 2. Логика фильтрации
+        if (auth()->user()->role !== 'super_admin') {
+            // Менеджер видит своих + глобальных
+            $currentTenant = $this->tenantService->getCurrentTenantId();
+            $query->where(function($q) use ($currentTenant) {
+                $q->where('tenant_id', $currentTenant)
+                  ->orWhereNull('tenant_id');
+            });
+        } elseif ($request->has('tenant_id') && $request->tenant_id) {
+            // Супер-админ фильтрует по магазину
+            $query->where('tenant_id', $request->tenant_id);
+        }
+
+        if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -53,40 +75,134 @@ class UserController extends Controller
         }
 
         $users = $query->paginate(20);
+        
+        // Передаем текущий tenant_id для сохранения контекста в ссылках (хотя для users это менее критично)
+        $currentTenantId = auth()->user()->role === 'super_admin' ? $request->get('tenant_id') : $this->tenantService->getCurrentTenantId();
 
         return view('admin.users.index', compact('users', 'currentTenantId'));
     }
 
-    // 2. ПРОФИЛЬ КЛИЕНТА (С историей заказов)
-    public function show(Request $request, $id)
+    public function create()
     {
-        $this->resolveContext($request);
+        $user = new User();
+        $tenants = config('tenants.tenants');
+        return view('admin.users.form', compact('user', 'tenants'));
+    }
 
-        $user = User::with(['orders' => function($q) {
-            $q->latest();
-        }])->findOrFail($id);
+    public function store(Request $request)
+    {
+        $this->switchToPublic(); // Пишем в public
 
+        $isSuperAdmin = auth()->user()->role === 'super_admin';
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|unique:users,email',
+            'phone' => 'required|string|unique:users,phone',
+            'password' => 'required|string|min:6',
+            'tenant_id' => $isSuperAdmin ? 'nullable|string' : 'nullable',
+        ]);
+
+        // Нормализация телефона
+        $phone = $this->normalizePhone($validated['phone']);
+        
+        // Проверка уникальности телефона ПОСЛЕ нормализации
+        if (User::where('phone', $phone)->exists()) {
+             return back()->withErrors(['phone' => 'This phone number is already registered.'])->withInput();
+        }
+
+        // ОПРЕДЕЛЕНИЕ МАГАЗИНА
+        $tenantId = null;
+        if ($isSuperAdmin) {
+            $tenantId = $request->input('tenant_id');
+        } else {
+            // Если менеджер создает пользователя - он ПРИВЯЗЫВАЕТСЯ к магазину менеджера
+            $tenantId = $this->tenantService->getCurrentTenantId();
+        }
+
+        $accessKey = $validated['password']; 
+
+        User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $phone,
+            'password' => Hash::make($validated['password']),
+            'role' => 'client',
+            'tenant_id' => $tenantId, // Теперь менеджер записывает свой ID
+            'access_key' => $accessKey,
+        ]);
+
+        return redirect()->route('admin.users.index')->with('success', 'Customer created successfully.');
+    }
+
+    // ИСПОЛЬЗУЕМ $id ВМЕСТО Model Binding, ЧТОБЫ ИЗБЕЖАТЬ 404 В ЧУЖОЙ СХЕМЕ
+    public function show($id)
+    {
+        $this->switchToPublic();
+        $user = User::findOrFail($id);
         return view('admin.users.show', compact('user'));
     }
 
-    // 3. СМЕНА ПАРОЛЯ (Админом)
+    public function edit($id)
+    {
+        $this->switchToPublic();
+        $user = User::findOrFail($id);
+        $tenants = config('tenants.tenants');
+        return view('admin.users.form', compact('user', 'tenants'));
+    }
+
     public function update(Request $request, $id)
     {
-        $this->resolveContext($request);
+        $this->switchToPublic();
         $user = User::findOrFail($id);
 
-        // Если админ нажал "Сгенерировать новый пароль"
+        // Генерация пароля (кнопка Reset)
         if ($request->has('generate_password')) {
-            $newPassword = Str::random(8); // Простой 8-значный пароль
-            
+            $newPassword = Str::random(8);
             $user->update([
                 'password' => Hash::make($newPassword),
-                'access_key' => $newPassword // Обновляем и ключ доступа, чтобы он работал
+                'access_key' => $newPassword
             ]);
-
-            return back()->with('success', "Password reset successfully. New Key: {$newPassword}");
+            return back()->with('success', "New Key Generated: $newPassword");
         }
 
-        return back();
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => ['nullable', 'email', Rule::unique('users')->ignore($user->id)],
+            'phone' => ['required', 'string'], // Убрали уникальность здесь, проверим вручную
+            'password' => 'nullable|string|min:6',
+        ]);
+
+        $phone = $this->normalizePhone($validated['phone']);
+
+        // Ручная проверка уникальности телефона при обновлении
+        if (User::where('phone', $phone)->where('id', '!=', $user->id)->exists()) {
+            return back()->withErrors(['phone' => 'This phone number is taken by another user.'])->withInput();
+        }
+
+        $data = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $phone,
+        ];
+
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($validated['password']);
+            $data['access_key'] = $validated['password'];
+        }
+
+        $user->update($data);
+
+        return redirect()->route('admin.users.index')->with('success', 'Customer profile updated.');
+    }
+    
+    public function destroy($id)
+    {
+        if (auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+        $this->switchToPublic();
+        User::destroy($id);
+        return back()->with('success', 'User deleted.');
     }
 }

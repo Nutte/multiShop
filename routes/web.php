@@ -43,7 +43,7 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
             return back();
         })->name('switch_tenant');
 
-        Route::resource('users', UserController::class)->only(['index', 'show', 'update']);
+        Route::resource('users', UserController::class);
         
         Route::resource('managers', ManagerController::class)
             ->middleware(SuperAdminMiddleware::class);
