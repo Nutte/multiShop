@@ -4,7 +4,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\OrderManagementController;
+use App\Http\Controllers\Admin\OrderStatusController;
+use App\Http\Controllers\Admin\OrderExportController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ReportController;
@@ -19,6 +21,7 @@ use App\Http\Controllers\Admin\ManagerController;
 use App\Http\Controllers\Admin\ContactMessageController;
 use App\Http\Middleware\AdminTenantMiddleware;
 use App\Http\Middleware\SuperAdminMiddleware; 
+use App\Http\Middleware\CheckOrderTenantAccess;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\Client\AuthController as ClientAuthController;
 use App\Http\Controllers\Client\ProfileController;
@@ -48,12 +51,20 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         Route::resource('managers', ManagerController::class)
             ->middleware(SuperAdminMiddleware::class);
 
-        // ИСПРАВЛЕНИЕ: Убрали ->only([...]), добавили ->except(['destroy'])
-        // Теперь доступны: index, show, create, store, edit, update
-        Route::resource('orders', OrderController::class)->except(['destroy']);
-        
-        Route::post('/orders/{id}/notify', [OrderController::class, 'sendNotification'])->name('orders.notify');
-        
+        // Используем новые контроллеры для заказов
+        Route::prefix('orders')->name('orders.')->middleware(CheckOrderTenantAccess::class)->group(function () {
+            // Основные CRUD операции
+            Route::get('/', [OrderManagementController::class, 'index'])->name('index');
+            Route::get('/create', [OrderManagementController::class, 'create'])->name('create');
+            Route::post('/', [OrderManagementController::class, 'store'])->name('store');
+            Route::get('/{id}', [OrderManagementController::class, 'show'])->name('show');
+            Route::get('/{id}/edit', [OrderManagementController::class, 'edit'])->name('edit');
+            Route::put('/{id}', [OrderManagementController::class, 'update'])->name('update');
+            
+            // Старый маршрут для уведомлений (оставляем для обратной совместимости)
+            Route::post('/{id}/notify', [OrderManagementController::class, 'sendNotification'])->name('notify');
+        });
+
         Route::resource('messages', ContactMessageController::class)->only(['index', 'show', 'destroy']);
 
         Route::resource('products', ProductController::class);
@@ -78,6 +89,20 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
         Route::post('/inventory/send-telegram', [InventoryController::class, 'sendToTelegram'])->name('inventory.send_telegram');
+
+        // Маршруты для управления статусами заказов
+        Route::prefix('order-status')->name('order-status.')->group(function () {
+            Route::post('/{id}/quick-update', [OrderStatusController::class, 'quickUpdate'])->name('quick-update');
+            Route::get('/statistics', [OrderStatusController::class, 'statistics'])->name('statistics');
+            Route::post('/bulk-update', [OrderStatusController::class, 'bulkUpdate'])->name('bulk-update');
+        });
+
+        // Маршруты для экспорта заказов
+        Route::prefix('order-export')->name('order-export.')->group(function () {
+            Route::get('/csv', [OrderExportController::class, 'exportCsv'])->name('csv');
+            Route::get('/{id}/detail', [OrderExportController::class, 'exportOrderDetail'])->name('detail');
+            Route::get('/period-report', [OrderExportController::class, 'periodReport'])->name('period-report');
+        });
     });
 });
 

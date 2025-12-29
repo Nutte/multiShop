@@ -30,6 +30,7 @@ class AdminTenantMiddleware
                 try {
                     $this->tenantService->switchTenant($user->tenant_id);
                 } catch (\Exception $e) {
+                    \Log::error("Manager assigned to invalid tenant: {$user->tenant_id}", ['error' => $e->getMessage()]);
                     abort(500, "Manager assigned to invalid tenant: " . $user->tenant_id);
                 }
             }
@@ -42,6 +43,7 @@ class AdminTenantMiddleware
                     try {
                         $this->tenantService->switchTenant(session('admin_current_tenant_id'));
                     } catch (\Exception $e) {
+                        \Log::warning("Super admin tried to switch to invalid tenant: " . session('admin_current_tenant_id'), ['error' => $e->getMessage()]);
                         session()->forget('admin_current_tenant_id');
                     }
                 }

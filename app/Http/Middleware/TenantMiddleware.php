@@ -8,7 +8,8 @@ namespace App\Http\Middleware;
 use App\Services\TenantService;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB; // Добавлено
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class TenantMiddleware
@@ -27,27 +28,16 @@ class TenantMiddleware
 
         // РЕЖИМ 1: АДМИНКА
         if ($host === $adminDomain) {
-            // ИСПРАВЛЕНИЕ: Принудительно ставим public по умолчанию
-            // Это гарантирует, что Auth будет искать юзера в public.users
+            // Принудительно ставим public по умолчанию для авторизации
             DB::statement("SET search_path TO public");
 
-            // Если Супер-Админ выбрал магазин "посмотреть", переключаем ТОЛЬКО для данных
-            // Но это должно быть аккуратно реализовано в контроллерах. 
-            // Для входа (Login) критически важно быть в public.
-            
-            if (session()->has('admin_current_tenant_id')) {
+            // Если Супер-Админ выбрал магазин для просмотра
+            if (session()->has('admin_current_tenant_id') && !$request->routeIs('admin.login')) {
                 try {
                     $targetTenant = session('admin_current_tenant_id');
-                    // Важно: switchTenant меняет search_path.
-                    // Для корректной работы админки нам нужно:
-                    // 1. Auth -> Public schema
-                    // 2. Orders -> Tenant schema
-                    // Это сложно. Упростим: если мы логинимся (маршрут login), мы форсируем public.
-                    
-                    if (!$request->routeIs('admin.login')) {
-                         $this->tenantService->switchTenant($targetTenant);
-                    }
+                    $this->tenantService->switchTenant($targetTenant);
                 } catch (\Exception $e) {
+                    Log::warning("Super admin tried to switch to invalid tenant: {$targetTenant}", ['error' => $e->getMessage()]);
                     session()->forget('admin_current_tenant_id');
                 }
             }
@@ -63,12 +53,17 @@ class TenantMiddleware
             try {
                 $this->tenantService->switchTenant($tenantId);
             } catch (\Exception $e) {
+                Log::error("Tenant switch failed for host: {$host}", [
+                    'tenant_id' => $tenantId,
+                    'error' => $e->getMessage()
+                ]);
                 abort(500, "Tenant switch failed: " . $e->getMessage());
             }
 
             return $next($request);
         }
 
+        Log::warning("Site not found for domain: {$host}");
         abort(404, "Site not found for domain: {$host}");
     }
 }
