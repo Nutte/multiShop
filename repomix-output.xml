@@ -53,7 +53,9 @@ app/
         DashboardController.php
         InventoryController.php
         ManagerController.php
-        OrderController.php
+        OrderExportController.php
+        OrderManagementController.php
+        OrderStatusController.php
         ProductController.php
         PromoCodeController.php
         ReportController.php
@@ -713,6 +715,624 @@ class ManagerController extends Controller
         $manager->delete();
 
         return back()->with('success', 'Manager deleted.');
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/OrderExportController.php">
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Services\TenantService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+class OrderExportController extends Controller
+{
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
+    {
+        $this->tenantService = $tenantService;
+    }
+
+    /**
+     * Экспорт заказов в CSV
+     */
+    public function exportCsv(Request $request)
+    {
+        $tenantId = $request->get('tenant_id') ?? $this->tenantService->getCurrentTenantId();
+        
+        if (!$tenantId) {
+            return back()->with('error', 'Tenant context required.');
+        }
+
+        $this->tenantService->switchTenant($tenantId);
+
+        $orders = Order::with(['items', 'user'])->get();
+        
+        $csvData = $this->generateCsvData($orders);
+        $filename = "orders_export_" . date('Y-m-d_H-i-s') . ".csv";
+        
+        Storage::disk('local')->put("exports/{$filename}", $csvData);
+        
+        return Storage::disk('local')->download("exports/{$filename}", $filename);
+    }
+
+    /**
+     * Генерация данных для CSV
+     */
+    protected function generateCsvData($orders): string
+    {
+        $headers = [
+            'Order ID', 'Order Number', 'Customer Name', 'Customer Phone', 'Customer Email',
+            'Status', 'Total Amount', 'Shipping Method', 'Shipping Address',
+            'Created At', 'Items Count'
+        ];
+
+        $rows = [];
+        foreach ($orders as $order) {
+            $rows[] = [
+                $order->id,
+                $order->order_number,
+                $order->customer_name,
+                $order->customer_phone,
+                $order->customer_email,
+                $order->status,
+                $order->total_amount,
+                $order->shipping_method,
+                $order->shipping_address,
+                $order->created_at->format('Y-m-d H:i:s'),
+                $order->items->count()
+            ];
+        }
+
+        $output = fopen('php://temp', 'w');
+        fputcsv($output, $headers);
+        
+        foreach ($rows as $row) {
+            fputcsv($output, $row);
+        }
+        
+        rewind($output);
+        $csv = stream_get_contents($output);
+        fclose($output);
+        
+        return $csv;
+    }
+
+    /**
+     * Экспорт детальной информации по заказу
+     */
+    public function exportOrderDetail(Request $request, $id)
+    {
+        $tenantId = $request->get('tenant_id') ?? $this->tenantService->getCurrentTenantId();
+        
+        if (!$tenantId) {
+            return back()->with('error', 'Tenant context required.');
+        }
+
+        $this->tenantService->switchTenant($tenantId);
+        
+        $order = Order::with(['items.product', 'user'])->findOrFail($id);
+        
+        $data = [
+            'order' => $order->toArray(),
+            'items' => $order->items->toArray(),
+            'exported_at' => now()->toDateTimeString(),
+        ];
+        
+        $filename = "order_{$order->order_number}_" . date('Y-m-d_H-i-s') . ".json";
+        
+        Storage::disk('local')->put("exports/{$filename}", json_encode($data, JSON_PRETTY_PRINT));
+        
+        return Storage::disk('local')->download("exports/{$filename}", $filename);
+    }
+
+    /**
+     * Генерация отчета по заказам за период
+     */
+    public function periodReport(Request $request)
+    {
+        $tenantId = $request->get('tenant_id') ?? $this->tenantService->getCurrentTenantId();
+        
+        if (!$tenantId) {
+            return back()->with('error', 'Tenant context required.');
+        }
+
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        $this->tenantService->switchTenant($tenantId);
+
+        $orders = Order::whereBetween('created_at', [
+            $request->input('start_date'),
+            $request->input('end_date')
+        ])->get();
+
+        $reportData = [
+            'period' => [
+                'start' => $request->input('start_date'),
+                'end' => $request->input('end_date'),
+            ],
+            'summary' => [
+                'total_orders' => $orders->count(),
+                'total_amount' => $orders->sum('total_amount'),
+                'avg_order_value' => $orders->avg('total_amount'),
+                'status_distribution' => $orders->groupBy('status')->map->count(),
+            ],
+            'orders' => $orders
+        ];
+
+        return response()->json($reportData);
+    }
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/OrderManagementController.php">
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\User;
+use App\Services\OrderService;
+use App\Services\TenantService;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+
+class OrderManagementController extends Controller
+{
+    protected OrderService $orderService;
+    protected TenantService $tenantService;
+
+    public function __construct(OrderService $orderService, TenantService $tenantService)
+    {
+        $this->orderService = $orderService;
+        $this->tenantService = $tenantService;
+    }
+
+    /**
+     * Список заказов
+     */
+    public function index(Request $request)
+    {
+        $currentTenantId = $this->resolveTenantContext($request);
+        
+        if ($currentTenantId) {
+            $orders = $this->getTenantOrders($currentTenantId);
+            return view('admin.orders.index', compact('orders', 'currentTenantId'));
+        }
+
+        // Для супер-админа: агрегация заказов из всех тенантов
+        $orders = $this->getAllTenantsOrders($request);
+        return view('admin.orders.index', ['orders' => $orders, 'currentTenantId' => null]);
+    }
+
+    /**
+     * Просмотр заказа
+     */
+    public function show(Request $request, $id)
+    {
+        $tenantId = $this->resolveTenantIdForShow($request);
+        
+        if (!$tenantId) {
+            return back()->with('error', 'Tenant context required.');
+        }
+
+        $this->tenantService->switchTenant($tenantId);
+        $order = Order::with(['items', 'user'])->findOrFail($id);
+        
+        return view('admin.orders.show', [
+            'order' => $order,
+            'currentTenantId' => $tenantId
+        ]);
+    }
+
+    /**
+     * Создание заказа (форма)
+     */
+    public function create(Request $request)
+    {
+        $currentTenantId = $this->resolveTenantIdForCreate($request);
+        $isSuperAdmin = auth()->user()->role === 'super_admin';
+
+        $data = $this->prepareOrderFormData($currentTenantId);
+        
+        return view('admin.orders.form', array_merge($data, [
+            'order' => null,
+            'isSuperAdmin' => $isSuperAdmin,
+            'currentTenantId' => $currentTenantId
+        ]));
+    }
+
+    /**
+     * Сохранение нового заказа
+     */
+    public function store(Request $request)
+    {
+        $tenantId = $request->input('tenant_id');
+        if ($tenantId) {
+            $this->tenantService->switchTenant($tenantId);
+        }
+
+        $validated = $this->validateOrderRequest($request);
+
+        // Если выбран пользователь, берем данные из профиля
+        if (!empty($validated['user_id'])) {
+            $this->syncCustomerDataFromUser($validated);
+        }
+
+        $this->orderService->createOrder($validated);
+
+        return redirect()->route('admin.orders.index', ['tenant_id' => $validated['tenant_id']])
+            ->with('success', 'Order created successfully.');
+    }
+
+    /**
+     * Редактирование заказа (форма)
+     */
+    public function edit(Request $request, $id)
+    {
+        $tenantId = $this->resolveTenantIdForEdit($request);
+        $this->tenantService->switchTenant($tenantId);
+
+        $order = Order::with('items')->findOrFail($id);
+        $data = $this->prepareOrderFormData($tenantId);
+        
+        return view('admin.orders.form', array_merge($data, [
+            'order' => $order,
+            'isSuperAdmin' => auth()->user()->role === 'super_admin',
+            'currentTenantId' => $tenantId
+        ]));
+    }
+
+    /**
+     * Обновление заказа
+     */
+    public function update(Request $request, $id)
+    {
+        $tenantId = $request->get('tenant_id');
+        $this->tenantService->switchTenant($tenantId);
+        
+        $order = Order::with('items')->findOrFail($id);
+
+        if ($request->input('update_mode') === 'status_only') {
+            return $this->updateOrderStatusOnly($request, $order);
+        }
+
+        $validated = $this->validateOrderUpdateRequest($request);
+
+        // Если выбран пользователь, берем данные из профиля
+        if (!empty($validated['user_id'])) {
+            $this->syncCustomerDataFromUser($validated);
+        }
+
+        $items = $request->has('items') ? $request->input('items') : null;
+        $this->orderService->updateOrder($order, $validated, $items);
+
+        return redirect()->route('admin.orders.index', ['tenant_id' => $tenantId])
+            ->with('success', 'Order updated successfully.');
+    }
+
+    /**
+     * Вспомогательные методы
+     */
+
+    protected function resolveTenantContext(Request $request): ?string
+    {
+        if (auth()->user()->role === 'super_admin') {
+            return $request->get('tenant_id');
+        }
+        return $this->tenantService->getCurrentTenantId();
+    }
+
+    protected function getTenantOrders(string $tenantId)
+    {
+        $this->tenantService->switchTenant($tenantId);
+        $orders = Order::latest()->paginate(20);
+        
+        $tenantName = config("tenants.tenants.{$tenantId}.name");
+        $orders->getCollection()->transform(function ($order) use ($tenantId, $tenantName) {
+            $order->tenant_id = $tenantId;
+            $order->tenant_name = $tenantName;
+            return $order;
+        });
+        
+        return $orders;
+    }
+
+    protected function getAllTenantsOrders(Request $request)
+    {
+        $allOrders = collect();
+        
+        foreach (config('tenants.tenants') as $tenantId => $config) {
+            try {
+                $this->tenantService->switchTenant($tenantId);
+                $tenantOrders = Order::latest()->limit(50)->get();
+                
+                foreach ($tenantOrders as $order) {
+                    $order->tenant_id = $tenantId;
+                    $order->tenant_name = $config['name'];
+                    $allOrders->push($order);
+                }
+            } catch (\Exception $e) {
+                \Log::warning("Failed to load orders for tenant {$tenantId}: " . $e->getMessage());
+                continue;
+            }
+        }
+
+        $sortedOrders = $allOrders->sortByDesc('created_at')->values();
+        
+        return new LengthAwarePaginator(
+            $sortedOrders->forPage($request->get('page', 1), 20),
+            $sortedOrders->count(),
+            20,
+            $request->get('page', 1),
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+    }
+
+    protected function resolveTenantIdForShow(Request $request): ?string
+    {
+        return $request->get('tenant_id') ?? $this->tenantService->getCurrentTenantId();
+    }
+
+    protected function resolveTenantIdForCreate(Request $request): ?string
+    {
+        $user = auth()->user();
+        
+        if ($user->role === 'super_admin') {
+            return $request->get('tenant_id');
+        }
+        
+        return $this->tenantService->getCurrentTenantId();
+    }
+
+    protected function resolveTenantIdForEdit(Request $request): string
+    {
+        return $request->get('tenant_id') ?? $this->tenantService->getCurrentTenantId();
+    }
+
+    protected function prepareOrderFormData(?string $tenantId): array
+    {
+        $productsCatalog = [];
+        $customers = [];
+
+        if ($tenantId) {
+            try {
+                $this->tenantService->switchTenant($tenantId);
+                
+                // Загрузка товаров
+                $products = Product::with('variants')->where('stock_quantity', '>', 0)->get();
+                foreach ($products as $prod) {
+                    $prodData = $prod->toArray();
+                    $prodData['tenant_id'] = $tenantId;
+                    $prodData['tenant_name'] = config("tenants.tenants.{$tenantId}.name");
+                    $prodData['variants'] = $prod->variants->toArray();
+                    $productsCatalog[] = $prodData;
+                }
+
+                // Загрузка клиентов
+                $customers = User::where('role', 'client')
+                    ->select('id', 'name', 'phone', 'email')
+                    ->orderBy('name')
+                    ->get();
+
+            } catch (\Exception $e) {
+                \Log::error("Failed to load form data for tenant {$tenantId}: " . $e->getMessage());
+            }
+        }
+
+        return [
+            'productsJson' => $productsCatalog,
+            'customersJson' => $customers
+        ];
+    }
+
+    protected function validateOrderRequest(Request $request): array
+    {
+        return $request->validate([
+            'tenant_id' => 'required|string',
+            'user_id' => 'nullable|exists:users,id',
+            'customer_name' => 'required|string',
+            'customer_phone' => 'required|string',
+            'customer_email' => 'nullable|email',
+            'shipping_method' => 'required|string',
+            'shipping_address' => 'required|string',
+            'is_instagram' => 'boolean',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'required|numeric',
+            'items.*.size' => 'nullable',
+        ]);
+    }
+
+    protected function validateOrderUpdateRequest(Request $request): array
+    {
+        return $request->validate([
+            'user_id' => 'nullable|exists:users,id',
+            'customer_name' => 'required|string',
+            'customer_phone' => 'required|string',
+            'customer_email' => 'nullable|email',
+            'shipping_method' => 'required|string',
+            'shipping_address' => 'required|string',
+            'status' => 'required|string',
+            'is_instagram' => 'boolean',
+            'items' => 'nullable|array',
+        ]);
+    }
+
+    protected function syncCustomerDataFromUser(array &$validatedData): void
+    {
+        $user = User::find($validatedData['user_id']);
+        if ($user) {
+            $validatedData['customer_name'] = $user->name;
+            $validatedData['customer_phone'] = $user->phone;
+            $validatedData['customer_email'] = $user->email;
+        }
+    }
+
+    protected function updateOrderStatusOnly(Request $request, Order $order)
+    {
+        $validated = $request->validate([
+            'status' => 'required|string',
+            'is_instagram' => 'boolean',
+        ]);
+        
+        $this->orderService->updateOrderStatus(
+            $order, 
+            $validated['status'], 
+            $request->has('is_instagram')
+        );
+
+        return back()->with('success', 'Status updated successfully.');
+    }
+    /**
+ * Отправка уведомления о заказе
+ */
+public function sendNotification(Request $request, $id)
+{
+    $tenantId = $request->get('tenant_id');
+    if (!$tenantId) {
+        $tenantId = $this->tenantService->getCurrentTenantId();
+    }
+    
+    if (!$tenantId) {
+        return back()->with('error', 'Tenant context required.');
+    }
+
+    $this->tenantService->switchTenant($tenantId);
+    $order = Order::with('items')->findOrFail($id);
+
+    // Получаем настройки Telegram для текущего магазина
+    $telegramSettings = \App\Models\TelegramSettings::where('tenant_id', $tenantId)->first();
+
+    if (!$telegramSettings || !$telegramSettings->bot_token || !$telegramSettings->chat_id) {
+        return back()->with('error', 'Telegram settings not configured.');
+    }
+
+    // Формируем сообщение
+    $message = "Новый заказ #{$order->order_number}\n";
+    $message .= "Клиент: {$order->customer_name}\n";
+    $message .= "Телефон: {$order->customer_phone}\n";
+    $message .= "Сумма: {$order->total_amount} руб.\n";
+    $message .= "Способ доставки: {$order->shipping_method}\n";
+    $message .= "Адрес: {$order->shipping_address}\n";
+
+    // Отправляем в Telegram
+    try {
+        $telegram = new \TelegramBot\Api\BotApi($telegramSettings->bot_token);
+        $telegram->sendMessage($telegramSettings->chat_id, $message);
+    } catch (\Exception $e) {
+        return back()->with('error', 'Failed to send notification: ' . $e->getMessage());
+    }
+
+    return back()->with('success', 'Notification sent successfully.');
+}
+}
+</file>
+
+<file path="app/Http/Controllers/Admin/OrderStatusController.php">
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Services\TenantService;
+use Illuminate\Http\Request;
+
+class OrderStatusController extends Controller
+{
+    protected TenantService $tenantService;
+
+    public function __construct(TenantService $tenantService)
+    {
+        $this->tenantService = $tenantService;
+    }
+
+    /**
+     * Быстрое обновление статуса заказа
+     */
+    public function quickUpdate(Request $request, $id)
+    {
+        $request->validate([
+            'tenant_id' => 'required|string',
+            'status' => 'required|string',
+            'is_instagram' => 'sometimes|boolean',
+        ]);
+
+        $this->tenantService->switchTenant($request->input('tenant_id'));
+        
+        $order = Order::findOrFail($id);
+        $order->update([
+            'status' => $request->input('status'),
+            'is_instagram' => $request->boolean('is_instagram', false),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status updated',
+            'order' => $order
+        ]);
+    }
+
+    /**
+     * Получение статистики по статусам
+     */
+    public function statistics(Request $request)
+    {
+        $tenantId = $request->get('tenant_id') ?? $this->tenantService->getCurrentTenantId();
+        
+        if (!$tenantId) {
+            return response()->json(['error' => 'Tenant context required'], 400);
+        }
+
+        $this->tenantService->switchTenant($tenantId);
+
+        $statistics = [
+            'new' => Order::where('status', 'new')->count(),
+            'processing' => Order::where('status', 'processing')->count(),
+            'shipped' => Order::where('status', 'shipped')->count(),
+            'delivered' => Order::where('status', 'delivered')->count(),
+            'cancelled' => Order::where('status', 'cancelled')->count(),
+            'total' => Order::count(),
+        ];
+
+        return response()->json($statistics);
+    }
+
+    /**
+     * Пакетное обновление статусов
+     */
+    public function bulkUpdate(Request $request)
+    {
+        $request->validate([
+            'tenant_id' => 'required|string',
+            'order_ids' => 'required|array',
+            'order_ids.*' => 'integer',
+            'status' => 'required|string',
+        ]);
+
+        $this->tenantService->switchTenant($request->input('tenant_id'));
+
+        $updatedCount = Order::whereIn('id', $request->input('order_ids'))
+            ->update(['status' => $request->input('status')]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Updated {$updatedCount} orders",
+            'updated_count' => $updatedCount
+        ]);
     }
 }
 </file>
@@ -1936,359 +2556,6 @@ class User extends Authenticatable
     public function orders()
     {
         return $this->hasMany(Order::class)->latest();
-    }
-}
-</file>
-
-<file path="app/Http/Controllers/Admin/OrderController.php">
-<?php
-// FILE: app/Http/Controllers/Admin/OrderController.php
-
-namespace App\Http\Controllers\Admin;
-
-use App\Http\Controllers\Controller;
-use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
-use App\Models\User;
-use App\Services\TenantService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Pagination\LengthAwarePaginator;
-
-class OrderController extends Controller
-{
-    protected TenantService $tenantService;
-
-    public function __construct(TenantService $tenantService)
-    {
-        $this->tenantService = $tenantService;
-    }
-
-    private function resolveContext(Request $request)
-    {
-        if (auth()->user()->role === 'super_admin') {
-            $tenantId = $request->get('tenant_id');
-            if ($tenantId) {
-                $this->tenantService->switchTenant($tenantId);
-                return $tenantId;
-            }
-            return null;
-        }
-        return $this->tenantService->getCurrentTenantId();
-    }
-
-    public function index(Request $request)
-    {
-        $currentTenantId = $this->resolveContext($request);
-        
-        if ($currentTenantId) {
-            $orders = Order::latest()->paginate(20);
-            $tenantName = config("tenants.tenants.{$currentTenantId}.name");
-            $orders->getCollection()->transform(function ($order) use ($currentTenantId, $tenantName) {
-                $order->tenant_id = $currentTenantId;
-                $order->tenant_name = $tenantName;
-                return $order;
-            });
-            return view('admin.orders.index', compact('orders', 'currentTenantId'));
-        }
-
-        // Агрегация для Супер-Админа
-        $allOrders = collect();
-        foreach (config('tenants.tenants') as $tenantId => $config) {
-            try {
-                $this->tenantService->switchTenant($tenantId);
-                $tenantOrders = Order::latest()->limit(50)->get();
-                foreach ($tenantOrders as $order) {
-                    $order->tenant_id = $tenantId;
-                    $order->tenant_name = $config['name'];
-                    $allOrders->push($order);
-                }
-            } catch (\Exception $e) { continue; }
-        }
-
-        $sortedOrders = $allOrders->sortByDesc('created_at')->values();
-        $paginatedOrders = new LengthAwarePaginator(
-            $sortedOrders->forPage($request->get('page', 1), 20),
-            $sortedOrders->count(),
-            20,
-            $request->get('page', 1),
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
-        return view('admin.orders.index', ['orders' => $paginatedOrders, 'currentTenantId' => null]);
-    }
-
-    public function show(Request $request, $id)
-    {
-        $tenantId = $request->get('tenant_id') ?? $this->tenantService->getCurrentTenantId();
-        if (!$tenantId) return back()->with('error', 'Tenant context required.');
-
-        $this->tenantService->switchTenant($tenantId);
-        $order = Order::with('items')->findOrFail($id);
-        
-        return view('admin.orders.show', ['order' => $order, 'currentTenantId' => $tenantId]);
-    }
-
-    public function create(Request $request)
-    {
-        $user = auth()->user();
-        $isSuperAdmin = $user->role === 'super_admin';
-        $currentTenantId = $request->get('tenant_id');
-
-        if (!$isSuperAdmin) {
-            $currentTenantId = $this->tenantService->getCurrentTenantId();
-        }
-
-        $productsCatalog = [];
-        $customers = []; 
-
-        if ($currentTenantId) {
-            try {
-                // 1. Загружаем товары
-                $this->tenantService->switchTenant($currentTenantId);
-                $products = Product::with('variants')->where('stock_quantity', '>', 0)->get();
-                
-                foreach ($products as $prod) {
-                    $prodData = $prod->toArray();
-                    $prodData['tenant_id'] = $currentTenantId;
-                    $prodData['tenant_name'] = config("tenants.tenants.{$currentTenantId}.name");
-                    $prodData['variants'] = $prod->variants->toArray();
-                    $productsCatalog[] = $prodData;
-                }
-
-                // 2. Загружаем клиентов
-                $customers = User::where('role', 'client')
-                    ->select('id', 'name', 'phone', 'email')
-                    ->orderBy('name')
-                    ->get();
-
-            } catch (\Exception $e) {}
-        }
-
-        return view('admin.orders.form', [
-            'order' => null,
-            'productsJson' => $productsCatalog,
-            'customersJson' => $customers,
-            'isSuperAdmin' => $isSuperAdmin,
-            'currentTenantId' => $currentTenantId
-        ]);
-    }
-
-    public function store(Request $request)
-    {
-        // ИСПРАВЛЕНИЕ: Сначала переключаем магазин, потом валидируем пользователя.
-        // Иначе exists:users,id ищет в public схеме, а клиент в схеме магазина.
-        $tenantId = $request->input('tenant_id');
-        if ($tenantId) {
-            $this->tenantService->switchTenant($tenantId);
-        }
-
-        $validated = $request->validate([
-            'tenant_id' => 'required|string',
-            'user_id' => 'nullable|exists:users,id', // Теперь проверка пойдет в правильной схеме
-            'customer_name' => 'required|string',
-            'customer_phone' => 'required|string',
-            'customer_email' => 'nullable|email',
-            'shipping_method' => 'required|string',
-            'shipping_address' => 'required|string',
-            'is_instagram' => 'boolean',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.price' => 'required|numeric',
-            'items.*.size' => 'nullable',
-        ]);
-
-        // Если выбран пользователь, перезаписываем данные из профиля
-        if (!empty($validated['user_id'])) {
-            $user = User::find($validated['user_id']);
-            if ($user) {
-                $validated['customer_name'] = $user->name;
-                $validated['customer_phone'] = $user->phone;
-                $validated['customer_email'] = $user->email;
-            }
-        }
-
-        DB::transaction(function () use ($validated) {
-            $total = 0;
-            foreach ($validated['items'] as $item) $total += $item['price'] * $item['quantity'];
-
-            $email = !empty($validated['customer_email']) ? $validated['customer_email'] : null;
-
-            $order = Order::create([
-                'order_number' => 'ORD-' . date('Ymd') . '-' . strtoupper(Str::random(5)),
-                'user_id' => $validated['user_id'] ?? null,
-                'customer_name' => $validated['customer_name'],
-                'customer_phone' => $validated['customer_phone'],
-                'customer_email' => $email,
-                'shipping_method' => $validated['shipping_method'],
-                'shipping_address' => $validated['shipping_address'],
-                'status' => 'new',
-                'subtotal' => $total,
-                'total_amount' => $total,
-                'is_instagram' => $validated['is_instagram'] ?? false,
-            ]);
-
-            $this->saveOrderItems($order, $validated['items']);
-        });
-
-        return redirect()->route('admin.orders.index', ['tenant_id' => $validated['tenant_id']])->with('success', 'Order created.');
-    }
-
-    public function edit(Request $request, $id)
-    {
-        $tenantId = $request->get('tenant_id');
-        if (!$tenantId) $tenantId = $this->tenantService->getCurrentTenantId();
-
-        $this->tenantService->switchTenant($tenantId);
-        $order = Order::with('items')->findOrFail($id);
-        
-        $products = Product::with('variants')->get();
-        $productsCatalog = [];
-        foreach ($products as $prod) {
-            $prodData = $prod->toArray();
-            $prodData['tenant_id'] = $tenantId;
-            $productsCatalog[] = $prodData;
-        }
-
-        $customers = User::where('role', 'client')
-            ->select('id', 'name', 'phone', 'email')
-            ->orderBy('name')
-            ->get();
-
-        return view('admin.orders.form', [
-            'order' => $order,
-            'productsJson' => $productsCatalog,
-            'customersJson' => $customers,
-            'isSuperAdmin' => auth()->user()->role === 'super_admin',
-            'currentTenantId' => $tenantId
-        ]);
-    }
-
-    public function update(Request $request, $id)
-    {
-        $tenantId = $request->get('tenant_id');
-        $this->tenantService->switchTenant($tenantId);
-        $order = Order::with('items')->findOrFail($id);
-
-        if ($request->input('update_mode') === 'status_only') {
-            $validated = $request->validate([
-                'status' => 'required|string',
-                'is_instagram' => 'boolean',
-            ]);
-            $this->handleStatusChangeStock($order, $validated['status']);
-            $order->update([
-                'status' => $validated['status'],
-                'is_instagram' => $request->has('is_instagram') ? 1 : 0
-            ]);
-            return back()->with('success', 'Status updated successfully.');
-        }
-
-        $validated = $request->validate([
-            'user_id' => 'nullable|exists:users,id',
-            'customer_name' => 'required|string',
-            'customer_phone' => 'required|string',
-            'customer_email' => 'nullable|email',
-            'shipping_method' => 'required|string',
-            'shipping_address' => 'required|string',
-            'status' => 'required|string',
-            'is_instagram' => 'boolean',
-            'items' => 'nullable|array', 
-        ]);
-
-        if (!empty($validated['user_id'])) {
-            $user = User::find($validated['user_id']);
-            if ($user) {
-                $validated['customer_name'] = $user->name;
-                $validated['customer_phone'] = $user->phone;
-                $validated['customer_email'] = $user->email;
-            }
-        }
-
-        DB::transaction(function () use ($order, $validated, $request) {
-            if ($request->has('items') && count($request->input('items')) > 0) {
-                foreach ($order->items as $oldItem) {
-                    $this->adjustStock($oldItem->product_id, $oldItem->size, $oldItem->quantity, 'increment');
-                }
-                $order->items()->delete();
-                $total = $this->saveOrderItems($order, $request->input('items'));
-                $order->update(['subtotal' => $total, 'total_amount' => $total]);
-            }
-
-            $this->handleStatusChangeStock($order, $validated['status']);
-
-            $email = !empty($validated['customer_email']) ? $validated['customer_email'] : $order->customer_email;
-
-            $order->update([
-                'user_id' => $validated['user_id'] ?? $order->user_id,
-                'customer_name' => $validated['customer_name'],
-                'customer_phone' => $validated['customer_phone'],
-                'customer_email' => $email,
-                'shipping_method' => $validated['shipping_method'],
-                'shipping_address' => $validated['shipping_address'],
-                'status' => $validated['status'],
-                'is_instagram' => $request->has('is_instagram') ? 1 : 0,
-            ]);
-        });
-
-        return redirect()->route('admin.orders.index', ['tenant_id' => $tenantId])->with('success', 'Order updated.');
-    }
-
-    private function handleStatusChangeStock($order, $newStatus)
-    {
-        if ($newStatus === 'cancelled' && $order->status !== 'cancelled') {
-             foreach ($order->items as $item) $this->adjustStock($item->product_id, $item->size, $item->quantity, 'increment');
-        }
-        if ($order->status === 'cancelled' && $newStatus !== 'cancelled') {
-             foreach ($order->items as $item) $this->adjustStock($item->product_id, $item->size, $item->quantity, 'decrement');
-        }
-    }
-
-    private function saveOrderItems($order, $itemsData) {
-        $total = 0;
-        foreach ($itemsData as $data) {
-            $product = Product::with('variants')->find($data['product_id']);
-            if (!$product) continue;
-
-            $lineTotal = $data['price'] * $data['quantity'];
-            $total += $lineTotal;
-
-            $hasVariants = $product->variants->isNotEmpty();
-            
-            if ($hasVariants) {
-                $size = !empty($data['size']) ? $data['size'] : null;
-                if (!$size) $size = $product->variants->first()->size;
-            } else {
-                $size = 'One Size';
-            }
-
-            OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $product->id,
-                'product_name' => $product->name,
-                'sku' => $product->sku,
-                'size' => $size,
-                'quantity' => $data['quantity'],
-                'price' => $data['price'],
-                'total' => $lineTotal,
-            ]);
-            
-            $this->adjustStock($product, $size, $data['quantity'], 'decrement');
-        }
-        return $total;
-    }
-
-    private function adjustStock($productOrId, $size, $qty, $action) {
-        $product = ($productOrId instanceof Product) ? $productOrId : Product::find($productOrId);
-        if (!$product) return;
-        $method = $action === 'increment' ? 'increment' : 'decrement';
-        $product->$method('stock_quantity', $qty);
-        if ($size && $size !== 'One Size') {
-            $v = $product->variants()->where('size', $size)->first();
-            if ($v) $v->$method('stock', $qty);
-        }
     }
 }
 </file>
