@@ -146,9 +146,14 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
                     </svg>
-                    @if(isset($cartCount) && $cartCount > 0)
+                    @if(empty($cartItems))
+                    @else
                         <span class="absolute -top-1 -right-2 w-4 h-4 bg-brand-accent text-white flex items-center justify-center text-[9px] font-bold border border-black">
-                            {{ $cartCount }}
+                    @php
+                        $tenantId = app(\App\Services\TenantService::class)->getCurrentTenantId();
+                        $count = count(session("cart_{$tenantId}", []));
+                    @endphp
+                    {{ $count }}
                         </span>
                     @endif
                 </a>

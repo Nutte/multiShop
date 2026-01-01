@@ -35,9 +35,24 @@
                     Available Now / 今すぐ利用可能
                 </p>
             </div>
+
+            <!-- CTA -->
+            <div class="absolute bottom-12 right-6 md:right-12 z-30">
+                <button class="bg-black text-white border-2 border-white px-8 py-4 font-display font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors shadow-sharp">
+                    Enter Store ->
+                </button>
+            </div>
         </div>
     </section>
 
+    <section class="px-4 sm:px-6 mb-24 max-w-7xl mx-auto">
+        <div class="flex justify-between items-end mb-12 border-b-2 border-white pb-4">
+            <div>
+                <span class="text-brand-accent font-mono text-xs mb-1 block">/// CHAPTER 01</span>
+                <h2 class="text-4xl md:text-5xl font-display font-bold uppercase">New Arrivals <span class="text-brand-gray text-2xl align-top">新着</span></h2>
+            </div>
+                <a href="#" class="text-xs font-mono text-gray-400 hover:text-white">[VIEW_ALL]</a>
+        </div>
     <!-- Filters -->
     <div class="flex flex-wrap justify-center gap-4 mb-12">
         <a href="{{ route('home') }}" class="px-6 py-2 border border-gray-600 font-mono uppercase text-xs transition {{ !request('category') ? 'bg-white text-black border-white font-bold' : 'text-gray-400 hover:text-white hover:border-white' }}">
@@ -87,7 +102,7 @@
             </div>
         @endforeach
     </div>
-
+    </section>
     <div class="mt-12">
         {{ $products->links() }}
     </div>
