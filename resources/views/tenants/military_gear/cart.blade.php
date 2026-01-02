@@ -1,9 +1,5 @@
 @extends('tenants.military_gear.layouts.military')
-@section('title', 'Supply Crate')
-
-@php
-    $cartItems = session('cart_military_gear', []);
-@endphp
+@section('title', 'Cart')
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-12">
@@ -20,7 +16,7 @@
     @else
         <div class="lg:grid lg:grid-cols-12 lg:gap-12">
             <div class="lg:col-span-8 space-y-6">
-                @foreach($cartItems as $itemId => $item)
+            @foreach($cartItems as $item)
                 <div class="tech-border bg-military-dark p-4 flex flex-col sm:flex-row gap-6 relative group">
                     <div class="corner-accent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                     <div class="w-full sm:w-32 aspect-[3/4] bg-black overflow-hidden flex-shrink-0">
@@ -36,16 +32,7 @@
                             <p class="text-[10px] font-mono text-zinc-600 mt-2">SKU: {{ $item['product']->sku }}</p>
                         </div>
                         <div class="flex justify-between items-end mt-4">
-                            <div class="flex items-center border border-military-gray">
-                                <form action="{{ route('cart.update', $itemId) }}" method="POST" class="flex">
-                                    @csrf
-                                    @method('PUT')
-                                    <button type="submit" name="action" value="decrease" class="w-8 h-8 flex items-center justify-center text-white hover:bg-military-gray transition-colors">-</button>
-                                    <input type="text" value="{{ $item['quantity'] }}" class="w-10 h-8 bg-transparent text-center text-white font-mono text-sm focus:outline-none" readonly>
-                                    <button type="submit" name="action" value="increase" class="w-8 h-8 flex items-center justify-center text-white hover:bg-military-gray transition-colors">+</button>
-                                </form>
-                            </div>
-                            <form action="{{ route('cart.remove', $itemId) }}" method="POST">
+                            <form action="{{ route('cart.remove', $item['row_id']) }}" method="POST">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-xs font-mono text-red-500 hover:text-red-400 uppercase tracking-wider hover:underline decoration-red-500 underline-offset-4">

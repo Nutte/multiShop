@@ -15,7 +15,7 @@
                 <button class="flex-1 py-2 text-sm font-bold uppercase text-military-accent border-b-2 border-military-accent">Login</button>
                 <button class="flex-1 py-2 text-sm font-bold uppercase text-military-text hover:text-white">Register</button>
             </div>
-            <form action="{{ route('client.login.post') }}" method="POST" class="space-y-4">
+            <form action="{{ url('/login') }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <input type="text" name="phone" class="w-full bg-black border-b border-military-gray text-white px-0 py-3 focus:border-military-accent focus:outline-none font-mono text-sm placeholder-zinc-700 transition-colors" placeholder="PHONE // ID" required>

@@ -1,6 +1,6 @@
 <!-- FILE: resources/views/tenants/street_style/cart.blade.php -->
 @extends('tenants.street_style.layouts.artefact')
-@section('title', 'Cart - ARTEFACT.ROOM')
+@section('title', 'Cart')
 
 @section('content')
 <main class="w-full pt-24 pb-20">
@@ -31,14 +31,6 @@
                         </form>
                     </div>
                 </div>
-                <div class="col-span-3 md:col-span-2 flex justify-center">
-                    <form action="{{ route('cart.update', $item['row_id']) }}" method="POST" class="flex items-center gap-2">
-                        @csrf
-                        <input type="number" name="quantity" value="{{ $item['quantity'] }}" min="1" 
-                               class="w-12 text-center font-sketch text-2xl bg-transparent border-b border-black outline-none">
-                        <button type="submit" class="text-[10px] font-bold uppercase opacity-0 group-hover:opacity-100 transition">Update</button>
-                    </form>
-                </div>
                 <div class="col-span-3 text-right font-tech font-bold text-lg">₴{{ number_format($item['total'] * 40, 0) }}</div>
             </div>
             @empty
@@ -64,11 +56,21 @@
                         <h3 class="font-tech text-sm uppercase mb-3 text-gray-400">Customer Details</h3>
                         <div class="space-y-3">
                             <input type="text" name="customer_name" placeholder="FULL NAME" required 
-                                   class="w-full p-2 bg-transparent border-b border-gray-700 text-white placeholder-gray-500">
+                                   class="w-full p-2 bg-transparent border-b border-gray-700 text-white placeholder-gray-400">
                             <input type="tel" name="customer_phone" placeholder="PHONE (+380...)" required 
-                                   class="w-full p-2 bg-transparent border-b border-gray-700 text-white placeholder-gray-500">
+                                   class="w-full p-2 bg-transparent border-b border-gray-700 text-white placeholder-gray-400">
                             <input type="email" name="customer_email" placeholder="EMAIL" 
-                                   class="w-full p-2 bg-transparent border-b border-gray-700 text-white placeholder-gray-500">
+                                   class="w-full p-2 bg-transparent border-b border-gray-700 text-white placeholder-gray-400">
+                            <label class="text-gray-400 uppercase mb-1">Address / Branch</label>
+                            <label class="block font-mono text-[10px] text-gray-500 uppercase mb-1">Shipping Method</label>
+                            <select name="shipping_method" class="w-full border-b border-gray-600 bg-transparent py-2 font-mono text-white focus:outline-none focus:border-[#ff003c] text-sm">
+                                <option value="nova_poshta" class="bg-black text-white">Nova Poshta</option>
+                                <option value="courier" class="bg-black text-white">Courier Delivery</option>
+                                <option value="pickup" class="bg-black text-white">Store Pickup</option>
+                            </select>
+                            <textarea name="shipping_address" placeholder="adress" 
+                                   class="w-full p-2 bg-transparent border-b border-gray-700 text-white placeholder-gray-400">
+                            </textarea>
                         </div>
                     </div>
                     

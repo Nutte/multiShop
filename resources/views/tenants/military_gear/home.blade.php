@@ -72,6 +72,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         @foreach($products as $product)
         <div class="group relative tech-border bg-military-dark p-2 transition-transform duration-300 hover:-translate-y-1 cursor-pointer">
+        <a href="{{ route('product.show', $product->slug) }}">
             <div class="corner-accent opacity-0 group-hover:opacity-100 transition-opacity"></div>
             
             <!-- Image -->
@@ -100,9 +101,9 @@
             <!-- Info -->
             <div class="flex justify-between items-start">
                 <div>
-                    <a href="{{ route('product.show', $product->slug) }}">
-                        <h3 class="text-white font-bold uppercase tracking-wide group-hover:text-military-accent transition-colors">{{ $product->name }}</h3>
-                    </a>
+                    
+                    <h3 class="text-white font-bold uppercase tracking-wide group-hover:text-military-accent transition-colors">{{ $product->name }}</h3>
+                    
                     <p class="text-military-text text-xs font-mono mt-1">{{ $product->clothingLine->name ?? 'Collection' }}</p>
                 </div>
                 <div class="text-right">
@@ -114,6 +115,7 @@
                     @endif
                 </div>
             </div>
+        </a>
         </div>
         @endforeach
     </div>

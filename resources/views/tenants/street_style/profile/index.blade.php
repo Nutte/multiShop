@@ -19,7 +19,7 @@
                     </div>
                     <div class="p-3 bg-black/10 border border-gray-700">
                         <span class="block text-[10px] text-gray-500 uppercase">Password</span>
-                        <span class="font-mono font-bold text-xl text-[#ccff00]">{{ session('generated_password') }}</span>
+                        <span class="font-mono font-bold text-xl text-pink-500">{{ session('generated_password') }}</span>
                     </div>
                 </div>
             </div>
@@ -35,7 +35,7 @@
             <div class="paper-block p-6">
                 <h2 class="text-lg font-display uppercase mb-4 text-gray-500 border-b border-gray-700 pb-2">My Profile</h2>
                 <div class="mb-6">
-                    <p class="font-bold text-lg text-white">{{ auth()->user()->name }}</p>
+                    <p class="font-bold text-lg text-gray-600"">{{ auth()->user()->name }}</p>
                     <p class="text-sm text-gray-400 font-mono">{{ auth()->user()->phone }}</p>
                 </div>
                 
@@ -92,13 +92,13 @@
 
                     <div class="flex flex-col md:flex-row gap-6 items-center">
                         <div class="flex-1">
-                            <div class="text-2xl font-bold font-mono text-white">#{{ $order->order_number }}</div>
+                            <div class="text-2xl font-bold font-mono text-gray-500">#{{ $order->order_number }}</div>
                             <div class="text-xs text-gray-400 uppercase mt-1">{{ $order->created_at->format('d F Y') }}</div>
                         </div>
                         
                         <div class="text-center px-8 border-l border-r border-gray-700 border-opacity-30">
                             <div class="text-xs text-gray-400 uppercase">Total</div>
-                            <div class="text-xl font-bold font-mono text-[#ccff00]">₴{{ number_format($order->total_amount * 40, 0) }}</div>
+                            <div class="text-xl font-bold font-mono text-pink-500">₴{{ number_format($order->total_amount * 40, 0) }}</div>
                         </div>
 
                         <div class="flex-1 text-right">
