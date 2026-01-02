@@ -311,12 +311,15 @@ class CartController extends Controller
                 if (!$user) {
                     $generatedPassword = Str::random(8); 
                     
+                    $tenantId = $this->tenantService->getCurrentTenantId();
+
                     $user = User::create([
                         'name' => $validated['customer_name'],
                         'email' => $validated['customer_email'],
                         'phone' => $normalizedPhone,
                         'password' => Hash::make($generatedPassword),
                         'role' => 'client',
+                        'tenant_id' => $tenantId, 
                         // Сохраняем тот же пароль как "Вечный ключ доступа"
                         // Laravel зашифрует его автоматически благодаря $casts
                         'access_key' => $generatedPassword, 

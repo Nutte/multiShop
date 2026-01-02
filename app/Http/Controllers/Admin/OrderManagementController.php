@@ -10,6 +10,8 @@ use App\Services\OrderService;
 use App\Services\TenantService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule; // ВАЖНО: Добавлен импорт Rule
 
 class OrderManagementController extends Controller
 {
@@ -22,9 +24,6 @@ class OrderManagementController extends Controller
         $this->tenantService = $tenantService;
     }
 
-    /**
-     * Список заказов
-     */
     public function index(Request $request)
     {
         $currentTenantId = $this->resolveTenantContext($request);
@@ -34,24 +33,25 @@ class OrderManagementController extends Controller
             return view('admin.orders.index', compact('orders', 'currentTenantId'));
         }
 
-        // Для супер-админа: агрегация заказов из всех тенантов
         $orders = $this->getAllTenantsOrders($request);
         return view('admin.orders.index', ['orders' => $orders, 'currentTenantId' => null]);
     }
 
-    /**
-     * Просмотр заказа
-     */
     public function show(Request $request, $id)
     {
         $tenantId = $this->resolveTenantIdForShow($request);
-        
-        if (!$tenantId) {
-            return back()->with('error', 'Tenant context required.');
-        }
+        if (!$tenantId) return back()->with('error', 'Tenant context required.');
 
         $this->tenantService->switchTenant($tenantId);
-        $order = Order::with(['items', 'user'])->findOrFail($id);
+        
+        $order = Order::with(['items'])->findOrFail($id);
+        
+        // Подгружаем пользователя. Так как User теперь явно public.users, связь должна работать лучше,
+        // но оставим проверку для надежности.
+        if ($order->user_id && !$order->relationLoaded('user')) {
+             $user = User::find($order->user_id);
+             $order->setRelation('user', $user);
+        }
         
         return view('admin.orders.show', [
             'order' => $order,
@@ -59,9 +59,6 @@ class OrderManagementController extends Controller
         ]);
     }
 
-    /**
-     * Создание заказа (форма)
-     */
     public function create(Request $request)
     {
         $currentTenantId = $this->resolveTenantIdForCreate($request);
@@ -76,9 +73,6 @@ class OrderManagementController extends Controller
         ]));
     }
 
-    /**
-     * Сохранение нового заказа
-     */
     public function store(Request $request)
     {
         $tenantId = $request->input('tenant_id');
@@ -88,7 +82,6 @@ class OrderManagementController extends Controller
 
         $validated = $this->validateOrderRequest($request);
 
-        // Если выбран пользователь, берем данные из профиля
         if (!empty($validated['user_id'])) {
             $this->syncCustomerDataFromUser($validated);
         }
@@ -99,9 +92,6 @@ class OrderManagementController extends Controller
             ->with('success', 'Order created successfully.');
     }
 
-    /**
-     * Редактирование заказа (форма)
-     */
     public function edit(Request $request, $id)
     {
         $tenantId = $this->resolveTenantIdForEdit($request);
@@ -117,9 +107,6 @@ class OrderManagementController extends Controller
         ]));
     }
 
-    /**
-     * Обновление заказа
-     */
     public function update(Request $request, $id)
     {
         $tenantId = $request->get('tenant_id');
@@ -133,9 +120,8 @@ class OrderManagementController extends Controller
 
         $validated = $this->validateOrderUpdateRequest($request);
 
-        // Если выбран пользователь, берем данные из профиля
         if (!empty($validated['user_id'])) {
-            $this->syncCustomerDataFromUser($validated);
+             $this->syncCustomerDataFromUser($validated);
         }
 
         $items = $request->has('items') ? $request->input('items') : null;
@@ -145,9 +131,7 @@ class OrderManagementController extends Controller
             ->with('success', 'Order updated successfully.');
     }
 
-    /**
-     * Вспомогательные методы
-     */
+    // --- Helpers ---
 
     protected function resolveTenantContext(Request $request): ?string
     {
@@ -175,30 +159,24 @@ class OrderManagementController extends Controller
     protected function getAllTenantsOrders(Request $request)
     {
         $allOrders = collect();
-        
         foreach (config('tenants.tenants') as $tenantId => $config) {
             try {
                 $this->tenantService->switchTenant($tenantId);
                 $tenantOrders = Order::latest()->limit(50)->get();
-                
                 foreach ($tenantOrders as $order) {
                     $order->tenant_id = $tenantId;
                     $order->tenant_name = $config['name'];
                     $allOrders->push($order);
                 }
             } catch (\Exception $e) {
-                \Log::warning("Failed to load orders for tenant {$tenantId}: " . $e->getMessage());
+                \Log::warning("Tenant error {$tenantId}: " . $e->getMessage());
                 continue;
             }
         }
-
-        $sortedOrders = $allOrders->sortByDesc('created_at')->values();
-        
+        $sorted = $allOrders->sortByDesc('created_at')->values();
         return new LengthAwarePaginator(
-            $sortedOrders->forPage($request->get('page', 1), 20),
-            $sortedOrders->count(),
-            20,
-            $request->get('page', 1),
+            $sorted->forPage($request->get('page', 1), 20),
+            $sorted->count(), 20, $request->get('page', 1),
             ['path' => $request->url(), 'query' => $request->query()]
         );
     }
@@ -211,11 +189,7 @@ class OrderManagementController extends Controller
     protected function resolveTenantIdForCreate(Request $request): ?string
     {
         $user = auth()->user();
-        
-        if ($user->role === 'super_admin') {
-            return $request->get('tenant_id');
-        }
-        
+        if ($user->role === 'super_admin') return $request->get('tenant_id');
         return $this->tenantService->getCurrentTenantId();
     }
 
@@ -229,11 +203,27 @@ class OrderManagementController extends Controller
         $productsCatalog = [];
         $customers = [];
 
+        // 1. Грузим пользователей из PUBLIC схемы.
+        // Так как мы добавили $table='public.users' в модель,
+        // теперь User::get() всегда вернет данные из паблика, даже без переключения схемы.
+        // Но для надежности и соблюдения логики предыдущих шагов оставим как есть.
+        try {
+            DB::statement('SET search_path TO public');
+            
+            $customers = User::whereIn('role', ['client', 'admin', 'manager', 'super_admin'])
+                ->select('id', 'name', 'phone', 'email', 'role')
+                ->orderBy('name')
+                ->get();
+                
+        } catch (\Exception $e) {
+             \Log::error("Failed to load users: " . $e->getMessage());
+        }
+
+        // 2. Грузим товары из TENANT схемы
         if ($tenantId) {
             try {
                 $this->tenantService->switchTenant($tenantId);
                 
-                // Загрузка товаров
                 $products = Product::with('variants')->where('stock_quantity', '>', 0)->get();
                 foreach ($products as $prod) {
                     $prodData = $prod->toArray();
@@ -242,21 +232,14 @@ class OrderManagementController extends Controller
                     $prodData['variants'] = $prod->variants->toArray();
                     $productsCatalog[] = $prodData;
                 }
-
-                // Загрузка клиентов
-                $customers = User::where('role', 'client')
-                    ->select('id', 'name', 'phone', 'email')
-                    ->orderBy('name')
-                    ->get();
-
             } catch (\Exception $e) {
-                \Log::error("Failed to load form data for tenant {$tenantId}: " . $e->getMessage());
+                \Log::error("Tenant data error {$tenantId}: " . $e->getMessage());
             }
         }
 
         return [
             'productsJson' => $productsCatalog,
-            'customersJson' => $customers
+            'customersJson' => $customers 
         ];
     }
 
@@ -264,7 +247,8 @@ class OrderManagementController extends Controller
     {
         return $request->validate([
             'tenant_id' => 'required|string',
-            'user_id' => 'nullable|exists:users,id',
+            // ИСПРАВЛЕНИЕ: Используем Rule::exists для корректного определения таблицы и схемы
+            'user_id' => ['nullable', Rule::exists(User::class, 'id')],
             'customer_name' => 'required|string',
             'customer_phone' => 'required|string',
             'customer_email' => 'nullable|email',
@@ -282,7 +266,8 @@ class OrderManagementController extends Controller
     protected function validateOrderUpdateRequest(Request $request): array
     {
         return $request->validate([
-            'user_id' => 'nullable|exists:users,id',
+            // ИСПРАВЛЕНИЕ: Используем Rule::exists. Исправляет ошибку "Database connection [public] not configured"
+            'user_id' => ['nullable', Rule::exists(User::class, 'id')],
             'customer_name' => 'required|string',
             'customer_phone' => 'required|string',
             'customer_email' => 'nullable|email',
@@ -319,47 +304,36 @@ class OrderManagementController extends Controller
 
         return back()->with('success', 'Status updated successfully.');
     }
-    /**
- * Отправка уведомления о заказе
- */
-public function sendNotification(Request $request, $id)
-{
-    $tenantId = $request->get('tenant_id');
-    if (!$tenantId) {
-        $tenantId = $this->tenantService->getCurrentTenantId();
-    }
     
-    if (!$tenantId) {
-        return back()->with('error', 'Tenant context required.');
+    public function sendNotification(Request $request, $id)
+    {
+        $tenantId = $request->get('tenant_id') ?? $this->tenantService->getCurrentTenantId();
+        
+        if (!$tenantId) return back()->with('error', 'Tenant context required.');
+
+        $this->tenantService->switchTenant($tenantId);
+        $order = Order::with('items')->findOrFail($id);
+
+        $telegramSettings = \App\Models\TelegramSettings::where('tenant_id', $tenantId)->first();
+
+        if (!$telegramSettings || !$telegramSettings->bot_token || !$telegramSettings->chat_id) {
+            return back()->with('error', 'Telegram settings not configured.');
+        }
+
+        $message = "Новый заказ #{$order->order_number}\n";
+        $message .= "Клиент: {$order->customer_name}\n";
+        $message .= "Телефон: {$order->customer_phone}\n";
+        $message .= "Сумма: {$order->total_amount} грн.\n";
+        $message .= "Способ доставки: {$order->shipping_method}\n";
+        $message .= "Адрес: {$order->shipping_address}\n";
+
+        try {
+            $telegram = new \TelegramBot\Api\BotApi($telegramSettings->bot_token);
+            $telegram->sendMessage($telegramSettings->chat_id, $message);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Telegram error: ' . $e->getMessage());
+        }
+
+        return back()->with('success', 'Notification sent successfully.');
     }
-
-    $this->tenantService->switchTenant($tenantId);
-    $order = Order::with('items')->findOrFail($id);
-
-    // Получаем настройки Telegram для текущего магазина
-    $telegramSettings = \App\Models\TelegramSettings::where('tenant_id', $tenantId)->first();
-
-    if (!$telegramSettings || !$telegramSettings->bot_token || !$telegramSettings->chat_id) {
-        return back()->with('error', 'Telegram settings not configured.');
-    }
-
-    // Формируем сообщение
-    $message = "Новый заказ #{$order->order_number}\n";
-    $message .= "Клиент: {$order->customer_name}\n";
-    $message .= "Телефон: {$order->customer_phone}\n";
-    $message .= "Сумма: {$order->total_amount} руб.\n";
-    $message .= "Способ доставки: {$order->shipping_method}\n";
-    $message .= "Адрес: {$order->shipping_address}\n";
-
-    // Отправляем в Telegram
-    try {
-        $telegram = new \TelegramBot\Api\BotApi($telegramSettings->bot_token);
-        $telegram->sendMessage($telegramSettings->chat_id, $message);
-    } catch (\Exception $e) {
-        return back()->with('error', 'Failed to send notification: ' . $e->getMessage());
-    }
-
-    return back()->with('success', 'Notification sent successfully.');
 }
-}   
-
