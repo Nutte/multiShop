@@ -52,7 +52,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 text-right">
-                             <a href="{{ route('admin.orders.show', ['order' => $order->id, 'tenant_id' => $order->tenant_id ?? request('tenant_id')]) }}" class="text-blue-600 hover:underline font-bold">View</a>
+                             <a href="{{ route('admin.orders.show', [$order->id, 'tenant_id' => $order->tenant_id ?? $currentTenantId]) }}" class="text-blue-600 hover:underline font-bold">View</a>
                         </td>
                     </tr>
                 @empty
