@@ -97,8 +97,14 @@
 
                 @if(auth()->user()->role === 'super_admin')
                     <a href="{{ route('admin.settings.index') }}" 
-                       class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.settings*') ? 'bg-gray-700 text-yellow-400' : '' }}">
+                       class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.settings.index') ? 'bg-gray-700 text-yellow-400' : '' }}">
                        Settings & Telegram
+                    </a>
+                @endif
+                @if(auth()->user()->role === 'super_admin')
+                    <a href="{{ route('admin.settings.content') }}" 
+                       class="block px-4 py-2 hover:bg-gray-700 rounded {{ request()->routeIs('admin.settings.content') ? 'bg-gray-700 text-yellow-400' : '' }}">
+                       Content
                     </a>
                 @endif
             </nav>

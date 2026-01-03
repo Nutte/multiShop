@@ -57,3 +57,50 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+```
+
+{{-- Короткий синтаксис для вывода --}}
+
+{{-- Проверить наличие блока --}}
+@if(ContentHelper::has('header'))
+    {{-- Вывести заголовок блока --}}
+    <h1>{{ ContentHelper::title('header') }}</h1>
+    
+    {{-- Вывести текстовый контент --}}
+    <div>{{ ContentHelper::text('header') }}</div>
+    
+    {{-- Вывести блок целиком с оберткой --}}
+    {!! ContentHelper::render('header') !!}
+    
+    {{-- Или конкретный тип --}}
+    {!! ContentHelper::renderText('header') !!}
+@endif
+
+{{-- Работа с изображениями --}}
+@if(ContentHelper::has('logo'))
+    {{-- Получить URL изображения --}}
+    <img src="{{ ContentHelper::imageUrl('logo') }}" 
+         alt="{{ ContentHelper::imageAlt('logo', 'Логотип') }}">
+    
+    {{-- Или сгенерировать тег --}}
+    {!! ContentHelper::imageTag('logo', ['class' => 'logo', 'width' => 200]) !!}
+    
+    {{-- Или вывести с оберткой --}}
+    {!! ContentHelper::renderImage('logo') !!}
+@endif
+
+{{-- Получить все блоки определенного типа --}}
+@foreach(ContentHelper::all('text') as $block)
+    <div class="text-block">
+        <h3>{{ $block['title'] ?? '' }}</h3>
+        <p>{{ $block['content'] ?? '' }}</p>
+    </div>
+@endforeach
+
+{{-- Вывод через одну короткую функцию --}}
+{!! ContentHelper::render('section1') !!}
+{!! ContentHelper::render('section2') !!}
+{!! ContentHelper::render('hero-image') !!}
+
+```

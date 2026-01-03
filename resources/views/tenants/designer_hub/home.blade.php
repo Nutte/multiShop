@@ -32,7 +32,7 @@
                     </h1>
                 </div>
                 <p class="mt-4 bg-brand-accent text-black px-2 py-1 font-mono font-bold text-lg uppercase transform -rotate-2">
-                    Available Now / 今すぐ利用可能
+                {{ ContentHelper::title('header') }} / 今すぐ利用可能
                 </p>
             </div>
 

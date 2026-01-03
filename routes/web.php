@@ -85,6 +85,9 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         });
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('/settings/content', [SettingsController::class, 'content'])->name('settings.content');
+        Route::post('/settings/content/update', [SettingsController::class, 'updateContent'])->name('settings.content.update');
+        Route::post('/settings/content/delete', [SettingsController::class, 'deleteContent'])->name('settings.content.delete');
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
@@ -135,4 +138,26 @@ Route::group([], function () {
     // Main & Products
     Route::get('/', [ShopController::class, 'index'])->name('home');
     Route::get('/products/{slug}', [ShopController::class, 'show'])->name('product.show');
+
+    // FILE: routes/web.php
+    /*
+    Route::get('/test-content', function() {
+        echo "<h1>Тест системы контента</h1>";  
+        
+        // Проверяем
+        echo "<h2>1. Тест ContentHelper::has():</h2>";
+        echo ContentHelper::has('test_header') ? '✅ Блок найден' : '❌ Блок не найден';
+        
+        echo "<h2>2. Тест ContentHelper::text():</h2>";
+        echo ContentHelper::text('test_header', 'Нет контента');
+        
+        echo "<h2>3. Тест ContentHelper::renderText():</h2>";
+        echo ContentHelper::renderText('test_header');
+        
+        echo "<h2>4. Все блоки:</h2>";
+        echo '<pre>';
+        print_r(ContentHelper::all());
+        echo '</pre>';
+    });
+    */
 });
