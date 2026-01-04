@@ -51,17 +51,13 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         Route::resource('managers', ManagerController::class)
             ->middleware(SuperAdminMiddleware::class);
 
-        // Используем новые контроллеры для заказов
         Route::prefix('orders')->name('orders.')->middleware(CheckOrderTenantAccess::class)->group(function () {
-            // Основные CRUD операции
             Route::get('/', [OrderManagementController::class, 'index'])->name('index');
             Route::get('/create', [OrderManagementController::class, 'create'])->name('create');
             Route::post('/', [OrderManagementController::class, 'store'])->name('store');
             Route::get('/{id}', [OrderManagementController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [OrderManagementController::class, 'edit'])->name('edit');
             Route::put('/{id}', [OrderManagementController::class, 'update'])->name('update');
-            
-            // Старый маршрут для уведомлений (оставляем для обратной совместимости)
             Route::post('/{id}/notify', [OrderManagementController::class, 'sendNotification'])->name('notify');
         });
 
@@ -98,14 +94,12 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
         Route::post('/inventory/send-telegram', [InventoryController::class, 'sendToTelegram'])->name('inventory.send_telegram');
 
-        // Маршруты для управления статусами заказов
         Route::prefix('order-status')->name('order-status.')->group(function () {
             Route::post('/{id}/quick-update', [OrderStatusController::class, 'quickUpdate'])->name('quick-update');
             Route::get('/statistics', [OrderStatusController::class, 'statistics'])->name('statistics');
             Route::post('/bulk-update', [OrderStatusController::class, 'bulkUpdate'])->name('bulk-update');
         });
 
-        // Маршруты для экспорта заказов
         Route::prefix('order-export')->name('order-export.')->group(function () {
             Route::get('/csv', [OrderExportController::class, 'exportCsv'])->name('csv');
             Route::get('/{id}/detail', [OrderExportController::class, 'exportOrderDetail'])->name('detail');
@@ -142,6 +136,7 @@ Route::group([], function () {
 
     // Main & Products
     Route::get('/', [ShopController::class, 'index'])->name('home');
+    Route::get('/products', [ShopController::class, 'products'])->name('shop.products'); // ДОБАВЛЕНО
     Route::get('/products/{slug}', [ShopController::class, 'show'])->name('product.show');
 
     // FILE: routes/web.php

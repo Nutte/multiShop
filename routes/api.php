@@ -15,9 +15,10 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// Публичные маршруты каталога (защищены TenantMiddleware глобально в bootstrap/app.php)
+// Публичные маршруты каталога
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('/search', [ProductController::class, 'search']);
+    Route::get('/filter', [ProductController::class, 'filter']); // ДОБАВЛЕНО
     Route::get('/{id}', [ProductController::class, 'show']);
 });
