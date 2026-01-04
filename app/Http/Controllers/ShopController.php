@@ -173,4 +173,33 @@ class ShopController extends Controller
         
         return view($view, compact('products', 'categories', 'clothingLines', 'sizes', 'stats'));
     }
+
+    public function notFound()
+    {
+        $host = request()->getHost();
+        $adminDomain = config('tenants.admin_domain');
+        
+        // 🔹 ЕСЛИ ЭТО АДМИНКА
+        if ($host === $adminDomain) {
+            return response()->view('errors.admin-404', [], 404);
+        }
+        
+        // 🔹 ЕСЛИ ЭТО МАГАЗИН
+        try {
+            $tenantId = $this->resolveTenant();
+            
+            // 1. Пытаемся найти кастомную 404 для тенанта
+            $view = "tenants.{$tenantId}.errors.404";
+            
+            // 2. Если нет - общая 404
+            if (!view()->exists($view)) {
+                $view = 'errors.404';
+            }
+            
+            return response()->view($view, [], 404);
+        } catch (\Exception $e) {
+            // Если что-то пошло не так, показываем общую 404
+            return response()->view('errors.404', [], 404);
+        }
+    }
 }

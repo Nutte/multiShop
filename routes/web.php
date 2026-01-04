@@ -139,6 +139,8 @@ Route::group([], function () {
     Route::get('/products', [ShopController::class, 'products'])->name('shop.products'); // ДОБАВЛЕНО
     Route::get('/products/{slug}', [ShopController::class, 'show'])->name('product.show');
 
+    Route::fallback([ShopController::class, 'notFound']);
+
     // FILE: routes/web.php
     /*
     Route::get('/test-content', function() {
