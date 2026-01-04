@@ -11,11 +11,6 @@ class TenantSetting extends Model
 {
     protected $fillable = ['key', 'value', 'group'];
 
-    // Убрали кастинг, будем обрабатывать вручную
-    // protected $casts = [
-    //     'value' => 'array',
-    // ];
-
     public static function get(string $key, $default = null)
     {
         $setting = self::where('key', $key)->first();
@@ -114,5 +109,123 @@ class TenantSetting extends Model
             'remaining_blocks' => count($filteredBlocks),
             'deleted_files' => $deletedFiles
         ];
+    }
+
+    /**
+     * Экспортировать все блоки контента для магазина
+     */
+    public static function exportContent(string $tenantId)
+    {
+        $blocks = self::getContentBlocks($tenantId);
+        
+        // Добавляем мета-информацию
+        $exportData = [
+            'export_info' => [
+                'tenant_id' => $tenantId,
+                'export_date' => now()->toDateTimeString(),
+                'total_blocks' => count($blocks),
+                'version' => '1.0'
+            ],
+            'blocks' => $blocks
+        ];
+        
+        return $exportData;
+    }
+
+    /**
+     * Импортировать блоки контента для магазина
+     */
+    public static function importContent(string $tenantId, array $importData, string $mode = 'merge')
+    {
+        $existingBlocks = self::getContentBlocks($tenantId);
+        $importBlocks = $importData['blocks'] ?? [];
+        
+        $results = [
+            'total_imported' => 0,
+            'new_blocks' => 0,
+            'updated_blocks' => 0,
+            'skipped_blocks' => 0,
+            'errors' => []
+        ];
+        
+        if (empty($importBlocks)) {
+            $results['errors'][] = 'No blocks found in import data';
+            return $results;
+        }
+        
+        $finalBlocks = [];
+        
+        // Если режим replace - очищаем существующие
+        if ($mode === 'replace') {
+            $finalBlocks = [];
+            $existingBlocks = [];
+        } else {
+            // merge или update режимы
+            $finalBlocks = $existingBlocks;
+        }
+        
+        // Создаем карту существующих блоков по slug для быстрого поиска
+        $existingBlocksMap = [];
+        foreach ($existingBlocks as $index => $block) {
+            if (isset($block['slug'])) {
+                $existingBlocksMap[$block['slug']] = $index;
+            }
+        }
+        
+        foreach ($importBlocks as $importBlock) {
+            // Проверяем обязательные поля
+            if (!isset($importBlock['slug']) || !isset($importBlock['type'])) {
+                $results['errors'][] = "Block missing required fields (slug or type): " . json_encode($importBlock);
+                $results['skipped_blocks']++;
+                continue;
+            }
+            
+            $slug = $importBlock['slug'];
+            
+            // Генерируем новый ID для импортируемого блока
+            $newBlock = $importBlock;
+            $newBlock['id'] = uniqid('imported_', true);
+            $newBlock['updated_at'] = now()->toDateTimeString();
+            
+            // Если блока еще не было, устанавливаем дату создания
+            if (!isset($newBlock['created_at'])) {
+                $newBlock['created_at'] = now()->toDateTimeString();
+            }
+            
+            // Проверяем, существует ли уже блок с таким slug
+            if (isset($existingBlocksMap[$slug])) {
+                // Обновляем существующий блок
+                $existingIndex = $existingBlocksMap[$slug];
+                
+                // Сохраняем ID существующего блока, если он есть
+                if (isset($finalBlocks[$existingIndex]['id'])) {
+                    $newBlock['id'] = $finalBlocks[$existingIndex]['id'];
+                }
+                
+                // Сохраняем путь к файлу, если в импорте его нет
+                if ($mode === 'update' && isset($finalBlocks[$existingIndex]['path']) && !isset($newBlock['path'])) {
+                    $newBlock['path'] = $finalBlocks[$existingIndex]['path'];
+                }
+                
+                // Сохраняем дату создания
+                if (isset($finalBlocks[$existingIndex]['created_at'])) {
+                    $newBlock['created_at'] = $finalBlocks[$existingIndex]['created_at'];
+                }
+                
+                $finalBlocks[$existingIndex] = $newBlock;
+                $results['updated_blocks']++;
+            } else {
+                // Добавляем новый блок
+                $finalBlocks[] = $newBlock;
+                $results['new_blocks']++;
+            }
+            
+            $results['total_imported']++;
+        }
+        
+        // Сохраняем финальный результат
+        self::set("content_blocks_{$tenantId}", $finalBlocks, 'content');
+        
+        return $results;
     }
 }

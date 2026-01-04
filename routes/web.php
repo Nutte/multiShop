@@ -85,9 +85,14 @@ Route::domain(config('tenants.admin_domain'))->group(function () {
         });
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+
         Route::get('/settings/content', [SettingsController::class, 'content'])->name('settings.content');
         Route::post('/settings/content/update', [SettingsController::class, 'updateContent'])->name('settings.content.update');
         Route::post('/settings/content/delete', [SettingsController::class, 'deleteContent'])->name('settings.content.delete');
+        Route::post('/settings/content/export', [SettingsController::class, 'exportContent'])->name('settings.content.export');
+        Route::post('/settings/content/import', [SettingsController::class, 'importContent'])->name('settings.content.import');
+
+
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');

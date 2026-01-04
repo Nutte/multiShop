@@ -2,7 +2,7 @@
 @section('title', 'Shop Content Management')
 
 @section('content')
-<div class="max-w-5xl mx-auto" x-data="contentBuilder()">
+<div class="max-w-5xl mx-auto" x-data="contentBuilder()" x-init="init()">
     
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Store Content Customizer</h1>
@@ -10,7 +10,14 @@
         <div class="flex items-center gap-2">
             <span class="text-sm font-medium text-gray-500">Managing:</span>
             <select class="border p-2 rounded bg-white shadow-sm font-bold text-blue-600" 
-                    @change="window.location.href = '?tenant=' + $event.target.value">
+                    id="tenant-selector"
+                    onchange="if (window.unsavedChanges) {
+                        if (!confirm('You have unsaved changes. If you switch tenants, you will lose these changes. Continue?')) {
+                            this.value = '{{ $activeTenant }}';
+                            return;
+                        }
+                    }
+                    window.location.href = '?tenant=' + this.value + '&_=' + Date.now();">
                 @foreach($tenants as $id => $data)
                     <option value="{{ $id }}" {{ $activeTenant == $id ? 'selected' : '' }}>
                         {{ $data['name'] }}
@@ -20,26 +27,73 @@
         </div>
     </div>
 
-    <!-- Инструкция по использованию slug -->
-    <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 class="font-bold text-blue-800 mb-2">How to use unique identifiers:</h3>
-        <ul class="text-sm text-blue-700 space-y-1">
-            <li>• Each block needs a <strong>unique identifier</strong> (slug) to display it on store pages</li>
-            <li>• Use lowercase letters, numbers, and hyphens (e.g., "hero-section", "about-us", "promo-banner")</li>
-            <li>• To display a block in your store template use: <code class="bg-blue-100 px-2 py-1 rounded">@{{ '{' }}{{ '{' }} getContentBlock('your-slug') {{ '}' }}{{ '}' }}</code></li>
-        </ul>
-    </div>
-
-    @if ($errors->any())
-        <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h3 class="font-bold text-red-800 mb-2">Validation Errors:</h3>
-            <ul class="text-sm text-red-700">
-                @foreach ($errors->all() as $error)
-                    <li>• {{ $error }}</li>
-                @endforeach
-            </ul>
+    <!-- Панель импорта/экспорта -->
+    <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+        <div class="flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h3 class="font-bold text-blue-800">Import & Export Content</h3>
+                <p class="text-sm text-blue-600">Backup, restore or migrate content between stores</p>
+            </div>
+            
+            <div class="flex flex-wrap gap-3">
+                <!-- Форма импорта -->
+                <form action="{{ route('admin.settings.content.import') }}" method="POST" enctype="multipart/form-data" class="flex items-center gap-2">
+                    @csrf
+                    <input type="hidden" name="tenant_id" value="{{ $activeTenant }}">
+                    
+                    <select name="import_mode" class="border rounded px-3 py-2 text-sm bg-white">
+                        <option value="merge">Merge with existing</option>
+                        <option value="replace">Replace all content</option>
+                        <option value="update">Update existing only</option>
+                    </select>
+                    
+                    <input type="file" name="import_file" accept=".json,.csv" 
+                           class="text-sm border rounded p-2" required>
+                    
+                    <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 font-bold text-sm">
+                        📥 Import
+                    </button>
+                </form>
+                
+                <!-- Форма экспорта -->
+                <form action="{{ route('admin.settings.content.export') }}" method="POST" class="flex items-center gap-2">
+                    @csrf
+                    <input type="hidden" name="tenant_id" value="{{ $activeTenant }}">
+                    
+                    <select name="format" class="border rounded px-3 py-2 text-sm bg-white">
+                        <option value="json">JSON Format</option>
+                        <option value="csv">CSV Format (text only)</option>
+                    </select>
+                    
+                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-bold text-sm">
+                        📤 Export
+                    </button>
+                </form>
+            </div>
         </div>
-    @endif
+        
+        <!-- Информация о текущих блоках -->
+        <div class="mt-4 pt-4 border-t border-blue-200 text-sm text-blue-700">
+            <div class="flex gap-6">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold">{{ count($contentBlocks) }}</span>
+                    <span>content blocks</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-bold">{{ count(array_filter($contentBlocks, fn($b) => $b['type'] === 'text')) }}</span>
+                    <span>text blocks</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-bold">{{ count(array_filter($contentBlocks, fn($b) => $b['type'] === 'image')) }}</span>
+                    <span>images</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-bold">{{ count(array_filter($contentBlocks, fn($b) => $b['type'] === 'video')) }}</span>
+                    <span>videos</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Кнопки массового удаления -->
     <div x-show="selectedBlocks.length > 0" 
@@ -63,13 +117,10 @@
         @csrf
         <input type="hidden" name="tenant_id" value="{{ $activeTenant }}">
 
-        <div class="space-y-6 mb-8">
+        <div class="space-y-4 mb-8">
             <template x-for="(block, index) in blocks" :key="block.id">
-                <div class="bg-white border rounded-lg shadow-sm p-6 relative group hover:border-blue-300 transition"
-                     :class="{ 'border-red-300 bg-red-50': selectedBlocks.includes(block.id) }">
-                    
-                    <!-- Заголовок блока -->
-                    <div class="flex justify-between items-start mb-6">
+                <div class="bg-white border rounded-lg shadow-sm p-4 relative group">
+                    <div class="flex justify-between items-start mb-4">
                         <div class="flex items-center gap-3">
                             <input type="checkbox" 
                                    x-model="selectedBlocks" 
@@ -78,35 +129,22 @@
                             
                             <span class="bg-gray-100 text-gray-500 px-2 py-1 rounded text-xs font-bold uppercase" 
                                   x-text="block.type"></span>
+                            <span class="text-gray-400 font-mono text-xs">#<span x-text="index + 1"></span></span>
                             
                             <!-- Поле уникального идентификатора -->
-                            <div class="relative">
-                                <label class="block text-xs font-bold text-gray-500 mb-1">Unique Identifier:</label>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 mb-1">Identifier</label>
                                 <input type="text" 
                                        :name="`blocks[${index}][slug]`" 
                                        x-model="block.slug"
-                                       class="w-48 border rounded px-3 py-1 text-sm font-mono bg-gray-50 focus:bg-white"
-                                       placeholder="e.g., hero-section"
-                                       required
-                                       pattern="[a-z0-9\-]+"
-                                       title="Use lowercase letters, numbers, and hyphens only">
-                                <div class="absolute right-2 top-7 text-gray-400" title="Copy code for template">
-                                    <button type="button" @click="copyToClipboard(block.slug)" class="hover:text-blue-600">
-                                        📋
-                                    </button>
-                                </div>
+                                       class="w-32 border rounded px-2 py-1 text-xs font-mono bg-gray-50"
+                                       placeholder="e.g., header"
+                                       required>
                             </div>
                         </div>
-                        
-                        <div class="flex gap-2">
-                            <button type="button" 
-                                    @click="removeBlock(index)" 
-                                    class="text-red-400 hover:text-red-600 transition">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
-                            </button>
-                        </div>
+                        <button type="button" @click="removeBlock(index)" class="text-red-400 hover:text-red-600 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
                     </div>
 
                     <!-- Скрытые поля -->
@@ -116,98 +154,58 @@
                         <input type="hidden" :name="`blocks[${index}][created_at]`" :value="block.created_at">
                     </template>
 
-                    <!-- Текстовый блок -->
-                    <div x-show="block.type === 'text'" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 mb-1">Title (optional)</label>
-                            <input type="text" 
-                                   :name="`blocks[${index}][title]`" 
-                                   x-model="block.title"
-                                   class="w-full border rounded p-3 text-sm" 
-                                   placeholder="Block title...">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 mb-1">Content</label>
-                            <textarea :name="`blocks[${index}][content]`" 
-                                      x-model="block.content" 
-                                      rows="6" 
-                                      class="w-full border rounded p-3 focus:ring-2 focus:ring-blue-100 outline-none" 
-                                      placeholder="Enter text content..."></textarea>
+                    <!-- Поля для ТЕКСТА -->
+                    <div x-show="block.type === 'text'">
+                        <textarea :name="`blocks[${index}][content]`" x-model="block.content" 
+                                  rows="4" class="w-full border rounded p-3 focus:ring-2 focus:ring-blue-100 outline-none" 
+                                  placeholder="Enter text content..."></textarea>
+                        <div class="mt-2">
+                            <input type="text" :name="`blocks[${index}][title]`" x-model="block.title"
+                                   class="w-full border rounded p-2 text-sm" 
+                                   placeholder="Optional title...">
                         </div>
                     </div>
 
-                    <!-- Медиа блок (изображение/видео) -->
-                    <div x-show="block.type === 'image' || block.type === 'video'" class="space-y-4">
-                        <input type="hidden" :name="`blocks[${index}][old_path]`" :value="block.path">
+                    <!-- Поля для ФОТО / ВИДЕО -->
+                    <div x-show="block.type === 'image' || block.type === 'video'">
+                        <input type="hidden" :name="`blocks[${index}][old_path]`" x-model="block.path">
                         
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-500 mb-1">Upload New File</label>
-                                    <input type="file" 
-                                           :name="`blocks[${index}][file]`" 
-                                           class="w-full text-sm border rounded p-2"
-                                           @change="block.original_name = $event.target.files[0]?.name">
-                                    
-                                    <p class="text-[10px] text-gray-400 mt-1">Leave empty to keep current file</p>
-                                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 mb-1">Upload New File</label>
+                                <input type="file" :name="`blocks[${index}][file]`" class="w-full text-sm">
+                                <p class="text-[10px] text-gray-400 mt-1">Leave empty to keep current file</p>
                                 
-                                <div class="space-y-3">
+                                <div class="mt-4 space-y-3">
                                     <div>
                                         <label class="block text-xs font-bold text-gray-500 mb-1">Title</label>
-                                        <input type="text" 
-                                               :name="`blocks[${index}][title]`" 
-                                               x-model="block.title"
-                                               class="w-full border rounded p-2 text-sm" 
-                                               placeholder="Optional title...">
+                                        <input type="text" :name="`blocks[${index}][title]`" x-model="block.title" 
+                                               class="w-full border rounded p-2 text-sm" placeholder="Optional title...">
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold text-gray-500 mb-1">Alt Text</label>
-                                        <input type="text" 
-                                               :name="`blocks[${index}][alt]`" 
-                                               x-model="block.alt"
-                                               class="w-full border rounded p-2 text-sm" 
-                                               placeholder="Alt text for accessibility...">
+                                        <input type="text" :name="`blocks[${index}][alt]`" x-model="block.alt"
+                                               class="w-full border rounded p-2 text-sm" placeholder="Alt text for accessibility...">
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- Предпросмотр -->
-                            <div class="bg-gray-50 rounded-lg border border-dashed p-4 flex flex-col items-center justify-center min-h-[200px]">
+                            <div class="bg-gray-50 rounded border border-dashed flex items-center justify-center overflow-hidden min-h-[120px]">
                                 <template x-if="block.path">
-                                    <div class="w-full text-center">
+                                    <div class="w-full">
                                         <template x-if="block.type === 'image'">
-                                            <div>
-                                                <img :src="'/storage/' + block.path" 
-                                                     :alt="block.alt || block.title"
-                                                     class="max-h-40 mx-auto object-contain mb-3 rounded">
-                                                <p class="text-xs text-gray-500 truncate" 
-                                                   x-text="block.original_name || block.path.split('/').pop()"></p>
-                                                <template x-if="block.size">
-                                                    <p class="text-xs text-gray-400" 
-                                                       x-text="formatFileSize(block.size)"></p>
-                                                </template>
-                                            </div>
+                                            <img :src="'/storage/' + block.path" class="max-h-32 mx-auto object-contain">
                                         </template>
                                         <template x-if="block.type === 'video'">
-                                            <div class="text-center">
-                                                <div class="text-4xl mb-3">🎥</div>
-                                                <p class="text-xs text-blue-500 truncate" 
-                                                   x-text="block.original_name || block.path.split('/').pop()"></p>
-                                                <template x-if="block.size">
-                                                    <p class="text-xs text-gray-400" 
-                                                       x-text="formatFileSize(block.size)"></p>
-                                                </template>
+                                            <div class="text-center p-4">
+                                                <span class="text-3xl">🎥</span>
+                                                <p class="text-[10px] text-blue-500 truncate" x-text="block.path"></p>
                                             </div>
                                         </template>
                                     </div>
                                 </template>
                                 <template x-if="!block.path">
-                                    <div class="text-center">
-                                        <span class="text-4xl text-gray-300">📁</span>
-                                        <p class="text-gray-400 italic text-sm mt-3">No file uploaded</p>
-                                    </div>
+                                    <span class="text-gray-300 italic text-sm">No file uploaded</span>
                                 </template>
                             </div>
                         </div>
@@ -229,17 +227,17 @@
             </button>
         </div>
 
-        <!-- Панель сохранения -->
         <div class="sticky bottom-6 bg-white p-4 border rounded-xl shadow-2xl flex justify-between items-center">
-            <div class="text-sm text-gray-500">
-                <span class="font-bold" x-text="blocks.length"></span> blocks
-                <span x-show="selectedBlocks.length > 0" class="ml-3 text-red-600">
-                    (<span x-text="selectedBlocks.length"></span> selected for deletion)
-                </span>
+            <p class="text-sm text-gray-500 italic">Changes must be saved to take effect.</p>
+            <div class="flex gap-3">
+                <a href="{{ route('admin.settings.content') }}?tenant={{ $activeTenant }}&_={{ time() }}" 
+                   class="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-bold hover:bg-gray-300 transition">
+                    Cancel
+                </a>
+                <button type="submit" class="bg-blue-600 text-white px-10 py-3 rounded-lg font-bold hover:bg-blue-700 shadow-lg transition transform active:scale-95">
+                    Save All Changes
+                </button>
             </div>
-            <button type="submit" class="bg-blue-600 text-white px-10 py-3 rounded-lg font-bold hover:bg-blue-700 shadow-lg transition transform active:scale-95">
-                Save All Changes
-            </button>
         </div>
     </form>
 </div>
@@ -249,6 +247,36 @@ function contentBuilder() {
     return {
         blocks: @json($contentBlocks),
         selectedBlocks: [],
+        originalBlocks: JSON.parse(JSON.stringify(@json($contentBlocks))),
+        hasUnsavedChanges: false,
+        
+        init() {
+            // Следим за изменениями в блоках
+            this.$watch('blocks', (newBlocks) => {
+                this.checkForChanges();
+            }, { deep: true });
+            
+            // Инициализируем глобальную переменную для проверки несохраненных изменений
+            window.unsavedChanges = this.hasUnsavedChanges;
+            this.$watch('hasUnsavedChanges', (value) => {
+                window.unsavedChanges = value;
+            });
+            
+            // Предотвращаем случайный уход со страницы при несохраненных изменениях
+            window.addEventListener('beforeunload', (e) => {
+                if (this.hasUnsavedChanges) {
+                    e.preventDefault();
+                    e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                    return e.returnValue;
+                }
+            });
+        },
+        
+        checkForChanges() {
+            const currentBlocks = JSON.stringify(this.blocks);
+            const originalBlocks = JSON.stringify(this.originalBlocks);
+            this.hasUnsavedChanges = currentBlocks !== originalBlocks;
+        },
         
         addBlock(type) {
             const id = 'block_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -278,11 +306,11 @@ function contentBuilder() {
         
         removeBlock(index) {
             if (confirm('Remove this block?')) {
+                // Удаляем блок из selectedBlocks если он там есть
+                const blockId = this.blocks[index].id;
+                this.selectedBlocks = this.selectedBlocks.filter(id => id !== blockId);
+                
                 this.blocks.splice(index, 1);
-                const blockId = this.blocks[index]?.id;
-                if (blockId) {
-                    this.selectedBlocks = this.selectedBlocks.filter(id => id !== blockId);
-                }
             }
         },
         
@@ -309,9 +337,18 @@ function contentBuilder() {
                 const result = await response.json();
                 
                 if (result.success) {
+                    // Удаляем блоки локально
                     this.blocks = this.blocks.filter(block => !this.selectedBlocks.includes(block.id));
+                    this.originalBlocks = JSON.parse(JSON.stringify(this.blocks));
                     this.selectedBlocks = [];
+                    this.hasUnsavedChanges = false;
+                    
                     alert(result.message);
+                    
+                    // Перезагружаем страницу для полной синхронизации
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
                 } else {
                     alert('Error: ' + result.message);
                 }
@@ -319,26 +356,6 @@ function contentBuilder() {
                 console.error('Delete error:', error);
                 alert('An error occurred while deleting blocks');
             }
-        },
-        
-        formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        },
-        
-        formatFileSize(bytes) {
-            if (!bytes) return '';
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        },
-        
-        copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Copied: ' + text);
-            });
         }
     }
 }
