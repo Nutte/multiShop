@@ -8,7 +8,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Fonts: Chakra Petch (Headers), JetBrains Mono (Tech) -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -36,6 +36,16 @@
                     },
                     screens: {
                         'print': {'raw': 'print'},
+                    },
+                    animation: {
+                        'glitch': 'glitch 1s linear infinite',
+                    },
+                    keyframes: {
+                        glitch: {
+                            '2%, 64%': { transform: 'translate(2px,0) skew(0deg)' },
+                            '4%, 60%': { transform: 'translate(-2px,0) skew(0deg)' },
+                            '62%': { transform: 'translate(0,0) skew(5deg)' },
+                        }
                     }
                 }
             }
@@ -51,7 +61,6 @@
             position: relative;
             border: 1px solid #27272a;
         }
-        /* Уголки для рамок */
         .corner-accent::before {
             content: '';
             position: absolute;
@@ -82,6 +91,13 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #ea580c;
         }
+        
+        /* Checkbox Style */
+        .tactical-checkbox:checked {
+            background-color: #ea580c;
+            border-color: #ea580c;
+            background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='black' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+        }
 
         /* PRINT STYLES */
         @media print {
@@ -101,21 +117,67 @@
             .bg-military-dark, .bg-military-black {
                 background-color: transparent !important;
             }
-            .print-invert {
-                filter: invert(1);
-            }
         }
     </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col font-sans selection:bg-military-accent selection:text-white">
 
-    <!-- NAVIGATION (SHARED LAYOUT) -->
+    <!-- MOBILE MENU OVERLAY -->
+    <div id="mobile-menu" class="fixed inset-0 z-[100] bg-military-black/95 backdrop-blur-xl hidden flex-col transition-all duration-300 transform translate-x-full">
+        <!-- Close Button -->
+        <div class="absolute top-4 right-4">
+            <button onclick="toggleMobileMenu()" class="p-2 border border-military-gray text-white hover:border-military-accent hover:text-military-accent transition-colors">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        
+        <!-- Menu Links -->
+        <div class="flex-grow flex flex-col justify-center px-8 space-y-6">
+            <div class="border-l-2 border-military-accent pl-6">
+                <span class="text-xs font-mono text-military-text block mb-2">/// NAVIGATION</span>
+                <a href="{{ route('home') }}" onclick="toggleMobileMenu()" class="block text-4xl font-bold uppercase text-white hover:text-military-accent transition-colors mb-4">Base</a>
+                <a href="{{ route('shop.products') }}" onclick="toggleMobileMenu()" class="block text-4xl font-bold uppercase text-white hover:text-military-accent transition-colors mb-4">Armory (Catalog)</a>
+                @auth
+                <a href="{{ route('client.profile') }}" onclick="toggleMobileMenu()" class="block text-4xl font-bold uppercase text-white hover:text-military-accent transition-colors mb-4">Operator Data</a>
+                @else
+                <a href="{{ route('client.login') }}" onclick="toggleMobileMenu()" class="block text-4xl font-bold uppercase text-white hover:text-military-accent transition-colors mb-4">Operator Data</a>
+                @endauth
+                <a href="{{ route('contact.index') }}" onclick="toggleMobileMenu()" class="block text-4xl font-bold uppercase text-white hover:text-military-accent transition-colors">Comms</a>
+            </div>
+            
+            <div class="border-t border-military-gray pt-6 mt-6">
+                <span class="text-xs font-mono text-military-text block mb-4">/// QUICK ACCESS</span>
+                <div class="grid grid-cols-2 gap-4">
+                    <a href="{{ route('cart.index') }}" onclick="toggleMobileMenu()" class="border border-military-gray py-4 text-white font-mono uppercase text-sm hover:bg-military-accent hover:text-black hover:border-military-accent transition-colors flex items-center justify-center">
+                        Supply Crate [<span id="mobile-cart-count">{{ count(session('cart', [])) }}</span>]
+                    </a>
+                    @auth
+                    <a href="{{ route('client.profile') }}" onclick="toggleMobileMenu()" class="border border-military-gray py-4 text-white font-mono uppercase text-sm hover:bg-white hover:text-black hover:border-white transition-colors flex items-center justify-center">
+                        {{ strtoupper(substr(auth()->user()->name, 0, 3)) }}
+                    </a>
+                    @else
+                    <a href="{{ route('client.login') }}" onclick="toggleMobileMenu()" class="border border-military-gray py-4 text-white font-mono uppercase text-sm hover:bg-white hover:text-black hover:border-white transition-colors flex items-center justify-center">
+                        Login / ID
+                    </a>
+                    @endauth
+                </div>
+            </div>
+        </div>
+        
+        <!-- Decor Footer -->
+        <div class="p-8 text-[10px] font-mono text-zinc-600 uppercase flex justify-between">
+            <span>SYS.VER.2.0.4</span>
+            <span>SECURE CONN</span>
+        </div>
+    </div>
+
+    <!-- NAVIGATION -->
     <header class="fixed w-full z-50 bg-military-black/90 backdrop-blur-md border-b border-military-gray no-print">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <!-- Mobile Menu Button -->
                 <div class="flex items-center md:hidden">
-                    <button type="button" class="text-military-text hover:text-white" id="mobile-menu-button">
+                    <button type="button" onclick="toggleMobileMenu()" class="text-military-text hover:text-white">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
@@ -123,18 +185,16 @@
                 </div>
 
                 <!-- Logo -->
-                <a href="{{ route('home') }}" class="flex-shrink-0 flex items-center gap-2 cursor-pointer">
+                <a href="{{ route('home') }}" class="flex-shrink-0 flex items-center gap-2">
                     <div class="w-8 h-8 bg-military-accent flex items-center justify-center font-bold text-black text-xl">K</div>
                     <span class="font-bold text-2xl tracking-widest text-white uppercase">Karakurt<span class="text-military-accent text-xs align-top">.UA</span></span>
                 </a>
 
                 <!-- Desktop Nav -->
                 <nav class="hidden md:flex space-x-8">
-                    <a href="{{ route('home') }}" class="text-sm font-mono uppercase tracking-wider text-military-text hover:text-military-accent transition-colors">Главная</a>
-                    @foreach($categories ?? [] as $category)
-                        <a href="{{ route('home', ['category' => $category->slug]) }}" class="text-sm font-mono uppercase tracking-wider text-military-text hover:text-military-accent transition-colors">{{ $category->name }}</a>
-                    @endforeach
-                    <a href="{{ route('contact.index') }}" class="text-sm font-mono uppercase tracking-wider text-military-text hover:text-military-accent transition-colors">Контакты</a>
+                    <a href="{{ route('home') }}" class="text-sm font-mono uppercase tracking-wider {{ request()->routeIs('home') ? 'text-military-accent' : 'text-military-text' }} hover:text-military-accent transition-colors">Base</a>
+                    <a href="{{ route('shop.products') }}" class="text-sm font-mono uppercase tracking-wider {{ request()->routeIs('shop.products') ? 'text-military-accent' : 'text-military-text' }} hover:text-military-accent transition-colors">Armory</a>
+                    <a href="{{ route('contact.index') }}" class="text-sm font-mono uppercase tracking-wider {{ request()->routeIs('contact.*') ? 'text-military-accent' : 'text-military-text' }} hover:text-military-accent transition-colors">Comms</a>
                 </nav>
 
                 <!-- Icons -->
@@ -145,22 +205,20 @@
                     </button>
                     <!-- Cart -->
                     <a href="{{ route('cart.index') }}" class="text-military-text hover:text-white transition-colors relative">
-                        <span class="absolute -top-2 -right-2 bg-military-gray border border-military-accent text-military-accent text-[10px] font-mono px-1">
-                            {{ count(session('cart_military_gear', [])) }}
-                        </span>
+                        <span class="absolute -top-2 -right-2 bg-military-gray border border-military-accent text-military-accent text-[10px] font-mono px-1">{{ count(session('cart', [])) }}</span>
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
                     </a>
                     <!-- Auth/Profile Link -->
                     @auth
-                        <a href="{{ route('client.profile') }}" class="hidden md:block text-military-text hover:text-white font-mono text-xs uppercase border border-military-gray px-3 py-1 hover:border-military-accent transition-all group">
-                            <span class="group-hover:hidden">{{ strtoupper(substr(auth()->user()->name, 0, 5)) }}</span>
-                            <span class="hidden group-hover:inline text-military-accent">PROFILE</span>
-                        </a>
+                    <a href="{{ route('client.profile') }}" class="hidden md:block text-military-text hover:text-white font-mono text-xs uppercase border border-military-gray px-3 py-1 hover:border-military-accent transition-all group">
+                        <span class="group-hover:hidden">{{ strtoupper(substr(auth()->user()->name, 0, 3)) }}</span>
+                        <span class="hidden group-hover:inline text-military-accent">PROFILE</span>
+                    </a>
                     @else
-                        <a href="{{ route('client.login') }}" class="hidden md:block text-military-text hover:text-white font-mono text-xs uppercase border border-military-gray px-3 py-1 hover:border-military-accent transition-all group">
-                            <span class="group-hover:hidden">ВХОД</span>
-                            <span class="hidden group-hover:inline text-military-accent">ACCESS</span>
-                        </a>
+                    <a href="{{ route('client.login') }}" class="hidden md:block text-military-text hover:text-white font-mono text-xs uppercase border border-military-gray px-3 py-1 hover:border-military-accent transition-all group">
+                        <span class="group-hover:hidden">ACCESS</span>
+                        <span class="hidden group-hover:inline text-military-accent">LOGIN</span>
+                    </a>
                     @endauth
                 </div>
             </div>
@@ -172,24 +230,24 @@
         </div>
     </header>
 
-    <!-- CONTENT WRAPPER -->
+    <!-- CONTENT -->
     <main class="flex-grow pt-20">
         @if(session('success'))
-            <div class="fixed top-24 right-4 z-50 bg-green-900 border border-green-700 text-green-300 px-4 py-2 rounded text-sm font-mono">
-                {{ session('success') }}
-            </div>
+        <div class="fixed top-24 right-4 z-50 bg-green-900 border border-green-700 text-green-300 px-4 py-2 rounded text-sm font-mono">
+            {{ session('success') }}
+        </div>
         @endif
         
         @if(session('error'))
-            <div class="fixed top-24 right-4 z-50 bg-red-900 border border-red-700 text-red-300 px-4 py-2 rounded text-sm font-mono">
-                {{ session('error') }}
-            </div>
+        <div class="fixed top-24 right-4 z-50 bg-red-900 border border-red-700 text-red-300 px-4 py-2 rounded text-sm font-mono">
+            {{ session('error') }}
+        </div>
         @endif
         
         @yield('content')
     </main>
 
-    <!-- FOOTER (SHARED) -->
+    <!-- FOOTER -->
     <footer class="bg-military-black border-t border-military-gray pt-16 pb-8 no-print">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
@@ -208,10 +266,9 @@
                 <div>
                     <h4 class="text-white font-bold uppercase mb-4 text-sm">Навигация</h4>
                     <ul class="space-y-2 text-sm text-military-text">
-                        <li><a href="{{ route('home') }}" class="hover:text-military-accent transition-colors">> Каталог</a></li>
-                        <li><a href="#" class="hover:text-military-accent transition-colors">> О бренде</a></li>
+                        <li><a href="{{ route('home') }}" class="hover:text-military-accent transition-colors">> Главная</a></li>
+                        <li><a href="{{ route('shop.products') }}" class="hover:text-military-accent transition-colors">> Каталог</a></li>
                         <li><a href="{{ route('contact.index') }}" class="hover:text-military-accent transition-colors">> Контакты</a></li>
-                        <li><a href="#" class="hover:text-military-accent transition-colors">> FAQ</a></li>
                     </ul>
                 </div>
 
@@ -221,7 +278,6 @@
                         <li><a href="#" class="hover:text-military-accent transition-colors">> Доставка и оплата</a></li>
                         <li><a href="#" class="hover:text-military-accent transition-colors">> Обмен и возврат</a></li>
                         <li><a href="#" class="hover:text-military-accent transition-colors">> Таблица размеров</a></li>
-                        <li><a href="#" class="hover:text-military-accent transition-colors">> Публичная оферта</a></li>
                     </ul>
                 </div>
 
@@ -241,21 +297,23 @@
         </div>
     </footer>
 
-    <!-- Mobile Menu Script -->
     <script>
-        document.getElementById('mobile-menu-button')?.addEventListener('click', function() {
-            const nav = document.querySelector('nav.hidden');
-            if (nav) {
-                nav.classList.toggle('hidden');
-                nav.classList.toggle('block');
-                nav.classList.toggle('absolute');
-                nav.classList.toggle('top-20');
-                nav.classList.toggle('left-0');
-                nav.classList.toggle('w-full');
-                nav.classList.toggle('bg-military-black');
-                nav.classList.toggle('p-4');
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                menu.classList.add('flex');
+                setTimeout(() => {
+                    menu.classList.remove('translate-x-full');
+                }, 10);
+            } else {
+                menu.classList.add('translate-x-full');
+                setTimeout(() => {
+                    menu.classList.add('hidden');
+                    menu.classList.remove('flex');
+                }, 300);
             }
-        });
+        }
     </script>
 </body>
 </html>

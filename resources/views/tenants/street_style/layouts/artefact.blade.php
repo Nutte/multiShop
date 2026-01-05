@@ -38,115 +38,69 @@
         .font-sketch { font-family: 'Reenie Beanie', cursive; font-weight: 500; }
         .font-receipt { font-family: 'Courier Prime', monospace; }
 
-        /* --- STREET ELEMENTS --- */
-
-        /* Wheatpaste Poster Effect */
+        /* UI COMPONENTS (из index.html) */
+        .header-glass {
+            background: rgba(17, 17, 17, 0.85);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
         .poster-card {
             background-color: var(--c-paper);
             color: black;
             position: relative;
             box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .poster-card::before {
-            /* Glue wrinkle effect */
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 100%);
-            opacity: 0.3;
-            pointer-events: none;
+            transition: all 0.3s ease;
         }
         .poster-card:hover {
-            transform: scale(1.02) rotate(1deg);
+            transform: translateY(-5px) rotate(1deg);
             box-shadow: 0 15px 30px rgba(0,0,0,0.7), 0 0 0 2px var(--c-spray-neon);
             z-index: 10;
         }
-
-        /* Caution Tape Divider */
-        .caution-tape {
-            background: var(--c-tape);
+        
+        .filter-btn {
+            border: 1px solid #333;
+            color: #666;
+            transition: 0.2s;
+        }
+        .filter-btn:hover, .filter-btn.active {
+            border-color: var(--c-spray-neon);
+            color: var(--c-spray-neon);
+            background: rgba(204, 255, 0, 0.05);
+        }
+        
+        .check-box {
+            width: 16px;
+            height: 16px;
+            border: 1px solid #666;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 8px;
+        }
+        input:checked + .check-box {
+            background: var(--c-spray-neon);
+            border-color: var(--c-spray-neon);
+        }
+        input:checked + .check-box::after {
+            content: 'X';
             color: black;
-            font-weight: 900;
-            font-family: 'Michroma', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            overflow: hidden;
-            white-space: nowrap;
-            border-top: 4px solid black;
-            border-bottom: 4px solid black;
-            transform: rotate(-1deg) scale(1.05);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-            z-index: 20;
-            position: relative;
+            font-size: 10px;
+            font-weight: bold;
         }
-        .caution-scroll {
-            display: inline-block;
-            animation: marquee 15s linear infinite;
-        }
-
-        @keyframes marquee {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-        }
-
-        /* Spray Paint Tag */
-        .tag-sticker {
-            position: absolute;
-            padding: 0.2em 0.5em;
-            background: var(--c-spray-pink);
-            color: white;
-            font-family: 'Permanent Marker', cursive;
-            font-size: 1rem;
-            transform: rotate(-15deg);
-            box-shadow: 2px 2px 0px black;
-            z-index: 20;
-        }
-
-        /* Tape Strip */
+        
         .tape-strip {
             position: absolute;
-            width: 80px;
-            height: 25px;
             background-color: rgba(255, 255, 255, 0.3);
             backdrop-filter: blur(2px);
             box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-            transform: rotate(45deg);
             z-index: 20;
         }
-
-        /* --- EXISTING ELEMENTS --- */
-        .art-filter {
-            filter: grayscale(100%) contrast(1.2) brightness(0.9);
-            mix-blend-mode: multiply;
-        }
-        .group:hover .art-filter {
-            filter: grayscale(0%) contrast(1.0);
-            mix-blend-mode: normal;
-        }
-
-        .paper-block {
-            background-color: var(--c-paper);
-            color: #2d2d2d;
-            box-shadow: 10px 10px 0px rgba(0,0,0,0.5);
-        }
         
-        .input-sketch {
-            background: transparent;
-            border: none;
-            border-bottom: 2px solid rgba(0,0,0,0.2);
-            font-family: 'Reenie Beanie', cursive;
-            font-size: 1.5rem;
-            width: 100%;
-            outline: none;
-        }
-
-        /* Utilities */
-        .nav-tab-active {
-            color: var(--c-spray-neon);
-            text-shadow: 0 0 5px rgba(204, 255, 0, 0.5);
-        }
-        .hidden { display: none; }
+        .text-neon { color: var(--c-spray-neon); }
+        .bg-neon { background-color: var(--c-spray-neon); }
+        .border-neon { border-color: var(--c-spray-neon); }
+        .stroke-text { -webkit-text-stroke: 1px white; color: transparent; }
     </style>
 </head>
 <body class="antialiased min-h-screen relative selection:bg-pink-500 selection:text-white overflow-x-hidden">
@@ -167,8 +121,8 @@
     </div>
     
     <!-- HEADER -->
-    <header class="w-full fixed top-10 left-0 z-40 mix-blend-difference text-white pointer-events-none">
-        <div class="w-full px-6 h-20 flex items-center justify-between pointer-events-auto">
+    <header class="w-full fixed top-10 left-0 z-40 header-glass">
+        <div class="w-full px-6 h-20 flex items-center justify-between">
             <a href="{{ route('home') }}" class="relative group">
                 <span class="text-4xl font-display font-black tracking-tighter uppercase italic">Artefact</span>
                 <span class="absolute -bottom-2 right-0 font-spray text-xl text-pink-500 -rotate-6">System</span>

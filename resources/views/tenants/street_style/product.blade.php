@@ -12,7 +12,7 @@
         </div>
         <div class="text-white relative">
             <h1 class="font-display font-black text-6xl uppercase mb-2">{{ $product->name }}</h1>
-            <div class="font-sketch text-3xl text-blue-500 mb-8 rotate-[-1deg]">"{{ Str::limit($product->description, 50) ?? 'Urban essential' }}"</div>
+            <div class="font-sketch text-3xl text-blue-500 mb-8 rotate-[-1deg]">"{{ $product->description }}"</div>
             <div class="bg-[#1a1a1a] border-l-4 border-blue-600 p-6 mb-8 text-gray-300 font-tech text-sm leading-relaxed">
                 {{ $product->clothingLine->description ?? 'Heavy cotton. Hand printed. Unique piece.' }}
             </div>

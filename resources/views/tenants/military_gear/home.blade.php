@@ -6,7 +6,7 @@
 <section class="relative h-[85vh] w-full flex items-center justify-center overflow-hidden border-b border-military-gray">
     <!-- Background Image Placeholder (Darkened) -->
     <div class="absolute inset-0 z-0">
-        <img src="https://images.unsplash.com/photo-1542353436-312f0e1f67ff?q=80&w=2000&auto=format&fit=crop" alt="Hero Background" class="w-full h-full object-cover opacity-30 grayscale contrast-125">
+        <img src="https://scontent.cdninstagram.com/v/t51.82787-15/588410088_17916770049213160_4671984027501016884_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=104&ig_cache_key=Mzc3ODA3NDkxMjE3NTQyNTQwOA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0NDB4MTc5Mi5zZHIuQzMifQ%3D%3D&_nc_ohc=hGJl18bttNQQ7kNvwHC5PMw&_nc_oc=Admj9gWx5IY9wpbmdBXoitv_3difFAFQJ0Z9iQq5JWoVPuTQenS2sviFQzPztU-X3DI&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent.cdninstagram.com&_nc_gid=WP5g72AIyukNAE3uKXtPHg&oh=00_AfoMRWhQFjgQyVq5x_jX0uCdAjjkP3sgo9d1buCgn9G_ug&oe=696069B9" alt="Hero Background" class="w-full h-full object-cover opacity-30 grayscale contrast-125">
         <div class="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent"></div>
         <div class="absolute inset-0 bg-grid-pattern bg-grid opacity-10"></div>
     </div>
@@ -29,7 +29,7 @@
         </p>
         
         <div class="flex flex-col sm:flex-row gap-4">
-            <a href="#new-arrivals" class="group relative px-8 py-4 bg-military-light text-black font-bold uppercase tracking-widest overflow-hidden">
+            <a href="{{ route('shop.products') }}" class="group relative px-8 py-4 bg-military-light text-black font-bold uppercase tracking-widest overflow-hidden">
                 <span class="relative z-10 group-hover:text-white transition-colors">Смотреть каталог</span>
                 <div class="absolute inset-0 bg-military-accent transform -translate-x-full skew-x-12 group-hover:translate-x-0 transition-transform duration-300 ease-out"></div>
             </a>
@@ -66,7 +66,7 @@
 <section id="new-arrivals" class="max-w-7xl mx-auto px-4 py-24 relative">
     <div class="flex justify-between items-end mb-12 border-b border-military-gray pb-4">
         <h2 class="text-3xl md:text-5xl font-bold uppercase text-white">Новые поступления</h2>
-        <a href="{{ route('home') }}" class="hidden md:block font-mono text-military-accent text-sm hover:underline hover:text-white transition-colors">Смотреть все [Show_All]</a>
+        <a href="{{ route('shop.products') }}" class="hidden md:block font-mono text-military-accent text-sm hover:underline hover:text-white transition-colors">Смотреть все [Show_All]</a>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

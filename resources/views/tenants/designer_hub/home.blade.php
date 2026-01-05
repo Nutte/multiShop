@@ -18,7 +18,7 @@
             <!-- Manga Speed Lines Overlay -->
             <div class="absolute inset-0 bg-repeating-conic-gradient from-transparent via-[rgba(255,255,255,0.03)] z-10 opacity-30" style="background: repeating-conic-gradient(from 0deg, transparent 0deg 10deg, rgba(255,255,255,0.03) 10deg 12deg); pointer-events: none;"></div>
 
-            <img src="https://images.unsplash.com/photo-1595341888016-a392ef81b7de?q=80&w=2079&auto=format&fit=crop" class="w-full h-full object-cover img-manga" alt="Hero">
+            <img src="https://scontent.cdninstagram.com/v/t51.82787-15/524738401_17962437545950559_3319880687811562063_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=109&ig_cache_key=MzY4Njc2OTQyOTM5MTI4MjMyOA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0NDB4MTgwMC5zZHIuQzMifQ%3D%3D&_nc_ohc=SrWczVngTKgQ7kNvwH2trha&_nc_oc=AdmHEG-Ihe5R-EauLwT0QwNh8CL0jLgi7YSzsDXBeBcWJIf8ljqo3H2dggDY8sXjHo0&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent.cdninstagram.com&_nc_gid=GcZrityKby15HfefxKV4pQ&oh=00_AfrUvBDg4WKbyp-GBxW67atBVrAA0yroR1Mn6JWiLc1ndQ&oe=696065E1" class="w-full h-full object-cover img-manga" alt="Hero">
 
             <!-- Overlay Text -->
             <div class="absolute inset-0 flex flex-col justify-center items-center z-20 pointer-events-none">
@@ -39,7 +39,7 @@
             <!-- CTA -->
             <div class="absolute bottom-12 right-6 md:right-12 z-30">
                 <button class="bg-black text-white border-2 border-white px-8 py-4 font-display font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors shadow-sharp">
-                    Enter Store ->
+                    <a href="{{ route('shop.products') }}" class="">Enter Store -></a>
                 </button>
             </div>
         </div>
