@@ -1,13 +1,65 @@
 <!-- FILE: resources/views/admin/products/form.blade.php -->
 @extends('layouts.admin')
+
+@php
+    $user = auth()->user();
+    $isSuperAdmin = $user->role === 'super_admin';
+    $isEdit = isset($product) && $product->exists;
+    $title = $isEdit ? 'Edit Product' : 'Create Product';
+    $storeName = $currentTenantId ? config("tenants.tenants.{$currentTenantId}.name") : null;
+    
+    // Ключевая проверка: получаем tenant_id из URL или запроса
+    $urlTenantId = request()->get('tenant_id');
+    $hasTenantInUrl = !empty($urlTenantId);
+    
+    // Определяем, нужно ли показывать выбор магазина
+    $shouldShowStoreSelection = $isSuperAdmin && !$isEdit && !$hasTenantInUrl;
+@endphp
+
 @section('title', $title)
 
 @section('content')
+
+{{-- ИСПОЛЬЗУЕМ IF-ELSE ВМЕСТО RETURN --}}
+@if($shouldShowStoreSelection)
+    <div class="max-w-2xl mx-auto mt-10">
+        <div class="bg-white p-8 rounded shadow-lg border-t-4 border-blue-600 text-center">
+            <h1 class="text-2xl font-bold mb-4">Create New Product</h1>
+            <p class="text-gray-500 mb-6">Select a store to load categories and sizes.</p>
+            
+            <div class="inline-block w-full max-w-md text-left">
+                <select onchange="if(this.value) window.location.href = '{{ route('admin.products.create') }}?tenant_id=' + this.value"
+                        class="w-full border p-3 rounded bg-yellow-50 border-yellow-300 font-bold text-gray-800">
+                    <option value="">-- Choose Store --</option>
+                    @foreach(config('tenants.tenants') as $id => $data)
+                        <option value="{{ $id }}" {{ $urlTenantId == $id ? 'selected' : '' }}>🏪 {{ $data['name'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="mt-6">
+                <a href="{{ route('admin.products.index') }}" class="text-gray-500 hover:underline">
+                    ← Back to Products
+                </a>
+            </div>
+        </div>
+    </div>
+@else
+    {{-- ОСНОВНАЯ ФОРМА ТЕПЕРЬ В БЛОКЕ ELSE --}}
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">{{ $title }}</h1>
-        @if($previewUrl)
+        <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-bold">{{ $title }}</h1>
+            <!-- Для супер-админа при создании показываем выбранный магазин -->
+            @if($isSuperAdmin && !$isEdit)
+                <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm font-bold border border-blue-200">
+                    Store: {{ $storeName ?? 'Unknown' }}
+                    <a href="{{ route('admin.products.create') }}" class="ml-2 text-xs text-blue-600 hover:underline">(Change)</a>
+                </span>
+            @endif
+        </div>
+        @if($isEdit && $previewUrl)
             <a href="{{ $previewUrl }}" target="_blank" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500 flex items-center gap-2 font-bold shadow">
                 <span>👁️</span> Preview on Site
             </a>
@@ -28,18 +80,15 @@
         <form action="{{ $action }}" method="POST" enctype="multipart/form-data" id="productForm">
             @csrf
             @if($method !== 'POST') @method($method) @endif
-            @if(isset($currentTenantId)) <input type="hidden" name="tenant_id" value="{{ $currentTenantId }}"> @endif
-
-            <!-- ВЫБОР МАГАЗИНА -->
-            @if(auth()->user()->role === 'super_admin' && !$product->exists)
-                <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
-                    <label class="block text-sm font-bold mb-2 text-yellow-800">Target Store</label>
-                    <select name="target_tenant" class="w-full border p-2 rounded bg-white">
-                        @foreach(config('tenants.tenants') as $id => $data)
-                            <option value="{{ $id }}" {{ $currentTenantId == $id ? 'selected' : '' }}>{{ $data['name'] }}</option>
-                        @endforeach
-                    </select>
-                </div>
+            
+            <!-- Для супер-админа при создании добавляем hidden поле -->
+            @if($isSuperAdmin && !$isEdit)
+                <input type="hidden" name="target_tenant" value="{{ $currentTenantId }}">
+            @endif
+            
+            <!-- Также добавляем tenant_id для консистентности -->
+            @if(isset($currentTenantId))
+                <input type="hidden" name="tenant_id" value="{{ $currentTenantId }}">
             @endif
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -81,7 +130,10 @@
                         <h3 class="font-bold text-gray-700 border-b pb-2 mb-2">Classification & Inventory</h3>
                         
                         <!-- CATEGORIES -->
-                        <div x-data="{ selected: {{ json_encode($product->categories ? $product->categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values() : []) }}, options: {{ $categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values() }}, newCat: '' }">
+                        <div x-data="{ 
+                            selected: {{ json_encode($product->categories ? $product->categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values() : []) }}, 
+                            newCat: '' 
+                        }">
                              <label class="block text-sm font-bold mb-2">Categories</label>
                              <div class="flex flex-wrap gap-2 mb-2 p-2 border rounded bg-white min-h-[42px]">
                                 <template x-for="(cat, index) in selected" :key="index">
@@ -91,29 +143,54 @@
                                         <button type="button" @click="selected.splice(index, 1)" class="ml-1 text-blue-600 font-bold hover:text-red-500">&times;</button>
                                     </span>
                                 </template>
-                                <input type="text" x-model="newCat" @keydown.enter.prevent="if(newCat.trim()) { selected.push({name: newCat.trim()}); newCat = ''; }" @blur="if(newCat.trim()) { selected.push({name: newCat.trim()}); newCat = ''; }" placeholder="Add category..." class="outline-none flex-1 text-sm bg-transparent min-w-[100px]">
+                                <input type="text" x-model="newCat" 
+                                       @keydown.enter.prevent="if(newCat.trim()) { selected.push({name: newCat.trim()}); newCat = ''; }" 
+                                       @blur="if(newCat.trim()) { selected.push({name: newCat.trim()}); newCat = ''; }" 
+                                       placeholder="Add category..." 
+                                       class="outline-none flex-1 text-sm bg-transparent min-w-[100px]">
                              </div>
                              <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                                <template x-for="opt in options">
-                                    <button type="button" x-show="!selected.some(s => s.id === opt.id)" @click="selected.push(opt)" class="bg-gray-200 hover:bg-gray-300 text-xs px-2 py-1 rounded" x-text="opt.name"></button>
-                                </template>
+                                @foreach($categories as $category)
+                                <button type="button" 
+                                        x-show="!selected.some(s => s.id === {{ $category->id }})" 
+                                        @click="selected.push({id: {{ $category->id }}, name: '{{ $category->name }}'})" 
+                                        class="bg-gray-200 hover:bg-gray-300 text-xs px-2 py-1 rounded">
+                                    {{ $category->name }}
+                                </button>
+                                @endforeach
                              </div>
                         </div>
 
                         <!-- CLOTHING LINE -->
-                        <div x-data="{ options: {{ $lines->pluck('name') }} }">
+                        <div>
                             <label class="block text-sm font-bold mb-2">Clothing Line / Collection <span class="font-normal text-gray-400">(Optional)</span></label>
-                            <input type="text" name="clothing_line" value="{{ old('clothing_line', optional($product->clothingLine)->name) }}" list="lineList" class="w-full border p-2 rounded" placeholder="e.g. Summer 2025">
+                            <input type="text" 
+                                   name="clothing_line" 
+                                   value="{{ old('clothing_line', optional($product->clothingLine)->name) }}" 
+                                   list="lineList" 
+                                   class="w-full border p-2 rounded" 
+                                   placeholder="e.g. Summer 2025">
                             <datalist id="lineList">
-                                <template x-for="opt in options"><option :value="opt"></option></template>
+                                @foreach($lines as $line)
+                                <option value="{{ $line->name }}">
+                                @endforeach
                             </datalist>
                         </div>
 
                         <!-- TYPE -->
-                        <div x-data="{ options: {{ $types->pluck('value') }} }">
+                        <div>
                             <label class="block text-sm font-bold mb-2">Product Type</label>
-                            <input type="text" name="attributes_type" value="{{ old('attributes_type', $product->attributes['type'] ?? '') }}" list="typeList" class="w-full border p-2 rounded" required>
-                            <datalist id="typeList"><template x-for="opt in options"><option :value="opt"></option></template></datalist>
+                            <input type="text" 
+                                   name="attributes_type" 
+                                   value="{{ old('attributes_type', $product->attributes['type'] ?? '') }}" 
+                                   list="typeList" 
+                                   class="w-full border p-2 rounded" 
+                                   required>
+                            <datalist id="typeList">
+                                @foreach($types as $type)
+                                <option value="{{ $type->value }}">
+                                @endforeach
+                            </datalist>
                         </div>
 
                         <!-- VARIANTS -->
@@ -127,7 +204,10 @@
                                     <template x-for="(variant, index) in variants" :key="index">
                                         <div class="flex gap-2 items-center bg-white p-2 rounded border shadow-sm">
                                             <div class="w-1/2">
-                                                <select :name="`variants[${index}][size]`" x-model="variant.size" class="w-full border p-1 rounded text-sm bg-gray-50 uppercase font-mono" required>
+                                                <select :name="`variants[${index}][size]`" 
+                                                        x-model="variant.size" 
+                                                        class="w-full border p-1 rounded text-sm bg-gray-50 uppercase font-mono" 
+                                                        required>
                                                     <option value="" disabled>Select Size</option>
                                                     @foreach($sizes as $sizeOption)
                                                         <option value="{{ $sizeOption->value }}">{{ $sizeOption->value }}</option>
@@ -135,7 +215,13 @@
                                                 </select>
                                             </div>
                                             <div class="w-1/3 relative">
-                                                <input type="number" :name="`variants[${index}][stock]`" x-model="variant.stock" @input="calculateTotal()" placeholder="0" class="w-full border p-1 rounded text-sm pl-8 font-bold" min="0" required>
+                                                <input type="number" 
+                                                       :name="`variants[${index}][stock]`" 
+                                                       x-model="variant.stock" 
+                                                       placeholder="0" 
+                                                       class="w-full border p-1 rounded text-sm pl-8 font-bold" 
+                                                       min="0" 
+                                                       required>
                                                 <span class="absolute left-2 top-1.5 text-gray-400 text-xs">Qty:</span>
                                             </div>
                                             <button type="button" @click="removeVariant(index)" class="text-red-400 hover:text-red-600 font-bold px-2">&times;</button>
@@ -193,7 +279,7 @@
 
             <div class="flex justify-between items-center pt-6 border-t mt-6">
                 <a href="{{ route('admin.products.index', ['tenant_id' => $currentTenantId]) }}" class="text-gray-500 hover:underline">Cancel</a>
-                <button class="bg-blue-600 text-white font-bold py-3 px-8 rounded hover:bg-blue-500 shadow-lg" onclick="updateOrder()">
+                <button type="submit" class="bg-blue-600 text-white font-bold py-3 px-8 rounded hover:bg-blue-500 shadow-lg">
                     {{ $product->exists ? 'Update Product' : 'Create Product' }}
                 </button>
             </div>
@@ -201,7 +287,7 @@
     </div>
 
     <script>
-        // ... (скрипты изображений остаются те же)
+        // Сортировка изображений
         const existingList = document.getElementById('existingImageList');
         if (existingList) {
             Sortable.create(existingList, {
@@ -209,6 +295,7 @@
                 onEnd: function () { updateOrder(); }
             });
         }
+        
         function updateOrder() {
             if (!existingList) return;
             const items = Array.from(existingList.querySelectorAll('[data-id]'));
@@ -219,11 +306,13 @@
                 if (badge) badge.innerText = index === 0 ? 'Cover' : (index + 1);
             });
         }
+        
         function toggleDelete(checkbox) {
             const row = checkbox.closest('.group');
             row.style.opacity = checkbox.checked ? '0.4' : '1';
             row.style.backgroundColor = checkbox.checked ? '#fee2e2' : 'white';
         }
+        
         function handleFileSelect(event) {
             const container = document.getElementById('newImagePreview');
             container.innerHTML = '<p class="text-xs font-bold text-blue-600 uppercase">Ready to upload:</p>';
@@ -239,6 +328,41 @@
                 reader.readAsDataURL(file);
             });
         }
+        
         updateOrder();
+
+        // Валидация формы
+        document.addEventListener('alpine:initialized', () => {
+            const form = document.getElementById('productForm');
+            
+            form.addEventListener('submit', function(e) {
+                const stockInput = form.querySelector('input[name="stock_quantity"]');
+                const hasVariants = Alpine.$data(form.querySelector('[x-data]')).hasVariants;
+                
+                if (!hasVariants) {
+                    if (!stockInput.value || parseInt(stockInput.value) <= 0) {
+                        e.preventDefault();
+                        alert('Please enter a valid quantity for the product.');
+                        return;
+                    }
+                }
+                
+                const variants = Alpine.$data(form.querySelector('[x-data]')).variants;
+                let hasEmptyVariants = false;
+                
+                variants.forEach((variant, index) => {
+                    if (variant.size && variant.size.trim() !== '' && (!variant.stock || parseInt(variant.stock) < 0)) {
+                        hasEmptyVariants = true;
+                    }
+                });
+                
+                if (hasEmptyVariants) {
+                    e.preventDefault();
+                    alert('Please fill in all size variants with valid quantities.');
+                    return;
+                }
+            });
+        });
     </script>
+@endif
 @endsection

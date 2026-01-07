@@ -1,5 +1,5 @@
 <?php
-// FILE: app/Http/Controllers/Admin/ProductController.php
+// FILE: app/Http\Controllers/Admin/ProductController.php
 
 namespace App\Http\Controllers\Admin;
 
@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB; // Важно для транзакций
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -29,7 +29,7 @@ class ProductController extends Controller
         $this->productService = $productService;
     }
 
-    // --- CONTEXT HELPERS (Определение магазина) ---
+    // --- CONTEXT HELPERS ---
 
     private function resolveContext(Request $request)
     {
@@ -54,7 +54,7 @@ class ProductController extends Controller
         return null;
     }
 
-    // --- ACTIONS (Методы действий) ---
+    // --- ACTIONS ---
 
     public function index(Request $request)
     {
@@ -180,24 +180,44 @@ class ProductController extends Controller
             $totalStock = 0;
             $sizeList = [];
             
+            // 2. Определяем, есть ли реальные варианты (не пустые строки)
+            $hasRealVariants = false;
             foreach ($variantsInput as $v) {
-                if (!empty($v['size'])) {
-                    $totalStock += (int)($v['stock'] ?? 0);
-                    $sizeList[] = $v['size'];
+                if (!empty($v['size']) && trim($v['size']) !== '') {
+                    $hasRealVariants = true;
+                    break;
                 }
             }
+            
+            if ($hasRealVariants) {
+                // Товар С вариантами (размерами S, M, L и т.д.)
+                foreach ($variantsInput as $v) {
+                    if (!empty($v['size']) && trim($v['size']) !== '') {
+                        $totalStock += (int)($v['stock'] ?? 0);
+                        $sizeList[] = $v['size'];
+                    }
+                }
+            } else {
+                // Товар БЕЗ вариантов (One Size)
+                // Используем stock_quantity из запроса
+                $totalStock = (int)($request->input('stock_quantity', 0));
+                $sizeList[] = 'One Size';
+                
+                // Создаем один вариант для One Size
+                $variantsInput = [['size' => 'One Size', 'stock' => $totalStock]];
+            }
 
-            // 2. Находим или создаем Линейку Одежды
+            // 3. Находим или создаем Линейку Одежды
             $lineId = $this->resolveClothingLineId($request->clothing_line);
 
-            // 3. Создаем продукт (Включая sale_price)
+            // 4. Создаем продукт
             $product = $this->productService->create([
                 'name' => $validated['name'],
                 'slug' => Str::slug($validated['name']) . '-' . Str::random(4),
                 'price' => $validated['price'],
-                'sale_price' => $validated['sale_price'] ?? null, // Скидка
+                'sale_price' => $validated['sale_price'] ?? null,
                 'sku' => $validated['sku'],
-                'stock_quantity' => $totalStock, // Вычисленный сток
+                'stock_quantity' => $totalStock, // Теперь не будет 0 для One Size
                 'description' => $request->input('description'),
                 'clothing_line_id' => $lineId,
                 'attributes' => [
@@ -206,7 +226,7 @@ class ProductController extends Controller
                 ]
             ]);
 
-            // 4. Синхронизируем связи
+            // 5. Синхронизируем связи
             $this->syncAttributesData($request->attributes_type, $sizeList);
             $this->syncCategories($product, $request->categories);
             $this->syncImages($request, $product);
@@ -227,28 +247,48 @@ class ProductController extends Controller
         
         DB::transaction(function () use ($request, $product, $validated) {
             
-            // 1. Пересчет стока
+            // 1. Получаем варианты из формы
             $variantsInput = $request->input('variants', []);
             $totalStock = 0;
             $sizeList = [];
             
+            // 2. Определяем, есть ли реальные варианты
+            $hasRealVariants = false;
             foreach ($variantsInput as $v) {
-                if (!empty($v['size'])) {
-                    $totalStock += (int)($v['stock'] ?? 0);
-                    $sizeList[] = $v['size'];
+                if (!empty($v['size']) && trim($v['size']) !== '') {
+                    $hasRealVariants = true;
+                    break;
                 }
             }
+            
+            if ($hasRealVariants) {
+                // Товар С вариантами
+                foreach ($variantsInput as $v) {
+                    if (!empty($v['size']) && trim($v['size']) !== '') {
+                        $totalStock += (int)($v['stock'] ?? 0);
+                        $sizeList[] = $v['size'];
+                    }
+                }
+            } else {
+                // Товар БЕЗ вариантов (One Size)
+                // Используем stock_quantity из запроса
+                $totalStock = (int)($request->input('stock_quantity', 0));
+                $sizeList[] = 'One Size';
+                
+                // Создаем один вариант для One Size
+                $variantsInput = [['size' => 'One Size', 'stock' => $totalStock]];
+            }
 
-            // 2. Линейка
+            // 3. Линейка
             $lineId = $this->resolveClothingLineId($request->clothing_line);
 
-            // 3. Обновление полей (Включая sale_price)
+            // 4. Обновление полей
             $product->update([
                 'name' => $validated['name'],
                 'price' => $validated['price'],
-                'sale_price' => $validated['sale_price'] ?? null, // Скидка
+                'sale_price' => $validated['sale_price'] ?? null,
                 'sku' => $validated['sku'],
-                'stock_quantity' => $totalStock,
+                'stock_quantity' => $totalStock, // Теперь не будет 0 для One Size
                 'description' => $request->input('description'),
                 'clothing_line_id' => $lineId,
                 'attributes' => [
@@ -257,7 +297,7 @@ class ProductController extends Controller
                 ]
             ]);
 
-            // 4. Синхронизация связей
+            // 5. Синхронизация связей
             $this->syncAttributesData($request->attributes_type, $sizeList);
             $this->syncCategories($product, $request->categories);
             $this->syncImagesUpdate($request, $product);
@@ -276,22 +316,23 @@ class ProductController extends Controller
         return back()->with('success', 'Product deleted.');
     }
 
-    // --- PRIVATE HELPERS (Приватные методы) ---
+    // --- PRIVATE HELPERS ---
 
     private function validateProduct(Request $request, $id = null)
     {
         return $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
-            // Скидка должна быть меньше обычной цены
-            'sale_price' => 'nullable|numeric|min:0|lt:price', 
+            'sale_price' => 'nullable|numeric|min:0|lt:price',
             'sku' => 'required|string|max:50',
+            'stock_quantity' => 'required|integer|min:0', // ОБЯЗАТЕЛЬНОЕ поле
             'categories' => 'required|array',
             'attributes_type' => 'required|string',
             'clothing_line' => 'nullable|string|max:255',
             
-            'variants.*.size' => 'required|string',
-            'variants.*.stock' => 'required|integer|min:0',
+            // Варианты - иногда (не обязательно если товар One Size)
+            'variants.*.size' => 'sometimes|required|string',
+            'variants.*.stock' => 'sometimes|required|integer|min:0',
             
             'images.*' => 'image|max:10240',
             'new_images.*' => 'image|max:10240',
@@ -370,10 +411,12 @@ class ProductController extends Controller
 
     private function syncVariants(Product $product, array $variantsInput)
     {
-        // Удаляем старые варианты и создаем новые
+        // Удаляем старые варианты
         $product->variants()->delete();
+        
+        // Создаем новые варианты
         foreach ($variantsInput as $v) {
-            if (!empty($v['size'])) {
+            if (!empty($v['size']) && trim($v['size']) !== '') {
                 ProductVariant::create([
                     'product_id' => $product->id, 
                     'size' => $v['size'], 
@@ -383,13 +426,11 @@ class ProductController extends Controller
         }
     }
     
-    // Получение товаров со всех магазинов (для Super Admin)
     private function getAllTenantsProducts(Request $request) {
         $allProducts = new Collection();
         foreach (config('tenants.tenants') as $id => $config) {
             try {
                 $this->tenantService->switchTenant($id);
-                // Загружаем вместе с clothingLine
                 $query = Product::with(['categories', 'images', 'variants', 'clothingLine'])->latest()->take(5);
                 
                 if ($request->filled('search')) {
